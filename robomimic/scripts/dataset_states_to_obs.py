@@ -325,14 +325,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        required=True,
+        default="/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/demo_v141.hdf5",
+        required=False,
         help="path to input hdf5 dataset",
     )
     # name of hdf5 to write - it will be in the same directory as @dataset
     parser.add_argument(
         "--output_name",
         type=str,
-        required=True,
+        required=False,
+        default="test_dataset.hdf5",
         help="name of output hdf5 dataset",
     )
 
