@@ -161,6 +161,7 @@ def extract_trajectory(
         else:
             traj[k] = np.array(traj[k])
 
+
     return traj, camera_info
 
 
