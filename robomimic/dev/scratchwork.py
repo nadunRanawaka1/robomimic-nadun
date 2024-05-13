@@ -1,11 +1,7 @@
 import os
 import torch
+import nexusformat.nexus as nx
 
-CUDA_VISIBLE_DEVICES = os.environ.get("CUDA_VISIBLE_DEVICES", "")
-
-avail = torch.cuda.is_available()
-counts = torch.cuda.device_count()
-current = torch.cuda.current_device()
-name = torch.cuda.get_device_name(0)
+demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141.hdf5"
 
 print()
