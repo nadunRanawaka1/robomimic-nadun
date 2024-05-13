@@ -1,7 +1,7 @@
 {
     "algo_name": "bc",
     "experiment": {
-        "name": "lift_bc_rnn_low_dim",
+        "name": "lift_bc_rnn_image",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -27,7 +27,7 @@
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
-            "enabled": true,
+            "enabled": false,
             "n": 50,
             "horizon": 400,
             "rate": 50,
@@ -164,12 +164,9 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "robot0_eef_pos",
-                    "robot0_eef_quat",
-                    "robot0_gripper_qpos",
-                    "object"
                 ],
-                "rgb": [],
+                "rgb": ["agentview_image",
+                "robot0_eye_in_hand_image"],
                 "depth": [],
                 "scan": []
             },
@@ -190,7 +187,7 @@
             "rgb": {
                 "core_class": "VisualCore",
                 "core_kwargs": {},
-                "obs_randomizer_class": null,
+                "obs_randomizer_class": "CropRandomizer",
                 "obs_randomizer_kwargs": {}
             },
             "depth": {
