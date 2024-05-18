@@ -58,6 +58,7 @@ import imageio
 import numpy as np
 from copy import deepcopy
 import time
+import os
 
 import torch
 
@@ -68,6 +69,8 @@ import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.obs_utils as ObsUtils
 from robomimic.envs.env_base import EnvBase
 from robomimic.algo import RolloutPolicy
+from collections import defaultdict
+import pandas as pd
 
 
 def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None):
@@ -112,7 +115,6 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
         traj.update(dict(obs=[], next_obs=[]))
     try:
         for step_i in range(horizon):
-            start = time.time()
 
             # get action from policy
             act = policy(ob=obs)
@@ -156,7 +158,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
             obs = deepcopy(next_obs)
             state_dict = env.get_state()
 
-            print(f"Control freq: {1/(time.time() - start)}")
+
 
 
     except env.rollout_exceptions as e:
@@ -237,6 +239,8 @@ def run_trained_agent(args):
         total_samples = 0
 
     rollout_stats = []
+    start = time.time()
+    print(f"Evaluating control frequency: {args.control_freq}")
     for i in range(rollout_num_episodes):
         stats, traj = rollout(
             policy=policy, 
@@ -274,6 +278,8 @@ def run_trained_agent(args):
     print("Average Rollout Stats")
     print(json.dumps(avg_rollout_stats, indent=4))
 
+    avg_rollout_stats[f"Time for {rollout_num_episodes} demos"] = time.time() - start
+
     if write_video:
         video_writer.close()
 
@@ -284,6 +290,32 @@ def run_trained_agent(args):
         data_writer.close()
         print("Wrote dataset trajectories to {}".format(args.dataset_path))
 
+    return avg_rollout_stats
+
+
+def evaluate_over_control_freqs(args, start_range=10, end_range=300, step=2, success_threshold = 0.2):
+
+    eval_data = defaultdict(list)
+    counter = 0
+    for freq in range(start_range, end_range, step):
+
+        eval_data["control_freq"].append(freq)
+        args.control_freq = freq
+        rollout_stats = run_trained_agent(args)
+        for stat in rollout_stats:
+            eval_data[stat].append(rollout_stats[stat])
+
+        if rollout_stats['Success_Rate'] < success_threshold:
+            break
+
+    df = pd.DataFrame(eval_data)
+
+    control_freq_eval_save_path = os.path.abspath(os.path.join(args.agent, '..', '..', 'logs/control_freq_eval.xlsx'))
+
+    df.to_excel(control_freq_eval_save_path)
+
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -292,7 +324,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/lift_bc_rnn_low_dim/20240512231233/models/model_epoch_2000.pth",
+        default="/home/nadun/Data/phd_project/robomimic/bc_trained_models/lift_bc_rnn_low_dim_seq_10/20240514140435/models/model_epoch_1800.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )
@@ -301,7 +333,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=27,
+        default=20,
         help="number of rollouts",
     )
 
@@ -384,7 +416,18 @@ if __name__ == "__main__":
         default=20,
         help="how fast to run robot",
     )
+    parser.add_argument(
+        "--evaluate_control_freqs",
+        action='store_true',
+        help="whether to evaluate model over different control frequencies"
+    )
+
 
     args = parser.parse_args()
-    run_trained_agent(args)
+    args.evaluate_control_freqs = True
+
+    if args.evaluate_control_freqs:
+        evaluate_over_control_freqs(args)
+    else:
+        run_trained_agent(args)
 
