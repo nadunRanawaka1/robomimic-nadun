@@ -1,7 +1,7 @@
 {
     "algo_name": "bc",
     "experiment": {
-        "name": "lift_bc_rnn_image_seq_10",
+        "name": "lift_bc_rnn_image_seq_10_rerun",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,

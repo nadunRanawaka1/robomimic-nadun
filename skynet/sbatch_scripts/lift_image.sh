@@ -3,12 +3,14 @@
 #SBATCH --output=/coc/flash7/nkra3/logs/sbatch_out/robomimic_lift_image.out
 #SBATCH --error=/coc/flash7/nkra3/logs/sbatch_err/robomimic_lift_image.err
 #SBATCH --partition=rl2-lab
+#SBATCH --time 96:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=6
 #SBATCH --gpus-per-node="a40:1"
 #SBATCH --exclude="clippy"
-#SBATCH --mem-per-gpu=40G
+#SBATCH --qos="long"
+#SBATCH --mem-per-gpu=60G
 
 export PYTHONUNBUFFERED=TRUE
 source ~/.bashrc
