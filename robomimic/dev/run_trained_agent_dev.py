@@ -110,6 +110,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     video_count = 0  # video frame counter
     total_reward = 0.
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
+    total_inference_time = 0
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
@@ -117,7 +118,9 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
         for step_i in range(horizon):
 
             # get action from policy
+            start = time.time()
             act = policy(ob=obs)
+            total_inference_time += time.time() - start
 
             # play action
             next_obs, r, done, _ = env.step(act)
@@ -203,6 +206,7 @@ def run_trained_agent(args):
 
     # TODO arbitrarily doubling control freq here
     ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
+    print()
 
     # read rollout settings
     rollout_num_episodes = args.n_rollouts
@@ -293,7 +297,7 @@ def run_trained_agent(args):
     return avg_rollout_stats
 
 
-def evaluate_over_control_freqs(args, start_range=10, end_range=300, step=2, success_threshold = 0.2):
+def evaluate_over_control_freqs(args, start_range=10, end_range=200, step=2, success_threshold = 0.05):
 
     eval_data = defaultdict(list)
     counter = 0
@@ -305,8 +309,8 @@ def evaluate_over_control_freqs(args, start_range=10, end_range=300, step=2, suc
         for stat in rollout_stats:
             eval_data[stat].append(rollout_stats[stat])
 
-        if rollout_stats['Success_Rate'] < success_threshold:
-            break
+        # if rollout_stats['Success_Rate'] < success_threshold:
+        #     break
 
     df = pd.DataFrame(eval_data)
 
@@ -324,7 +328,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/home/nadun/Data/phd_project/robomimic/bc_trained_models/lift_bc_rnn_low_dim_seq_10/20240514140435/models/model_epoch_1800.pth",
+        default="/home/nadun/Data/phd_project/robomimic/bc_trained_models/lift_bc_rnn_image_seq_10_rerun/20240517200334/models/model_epoch_100.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )
@@ -424,7 +428,7 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
-    args.evaluate_control_freqs = True
+    # args.evaluate_control_freqs = True
 
     if args.evaluate_control_freqs:
         evaluate_over_control_freqs(args)

@@ -10,6 +10,9 @@ dist/
 # trained models folder
 /bc_trained_models
 
+#scratchwork
+scratchwork_2.py
+
 # local test dataset that is lazily downloaded by example scripts
 tests/assets/test.hdf5
 tests/assets/test_v141.hdf5

@@ -16,9 +16,10 @@ from robomimic.envs.env_base import EnvBase
 import nexusformat.nexus as nx
 
 ### Setup some constants
-DELTA_ACTION__MAGNITUDE_LIMIT = 1.0
+DELTA_ACTION__MAGNITUDE_LIMIT = 3.0
 DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
 DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
+SCALE_ACTION_LIMIT = 0.15
 
 
 
@@ -38,6 +39,14 @@ demo_file = h5py.File(demo_fn)
 
 ### Init env
 env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
+
+### Resetting controller max control input and output here
+env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION__MAGNITUDE_LIMIT
+env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION__MAGNITUDE_LIMIT
+
+env_meta['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
+env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
+
 env = EnvUtils.create_env_from_metadata(env_meta,
                                         render=True,
                                         use_image_obs=True)
@@ -302,9 +311,9 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
 
 
 ### execute functions
-replay_by_aggregating(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions.mp4")
-replay_by_skipping(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions.mp4")
-replay_normal_speed(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal.mp4")
+replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_3_100.mp4")
+replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
+# replay_normal_speed(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_2_100.mp4")
 
 
 
