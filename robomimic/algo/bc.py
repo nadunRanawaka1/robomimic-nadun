@@ -19,6 +19,9 @@ import robomimic.utils.obs_utils as ObsUtils
 
 from robomimic.algo import register_algo_factory_func, PolicyAlgo
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 @register_algo_factory_func("bc")
 def algo_config_to_class(algo_config):
@@ -235,7 +238,7 @@ class BC(PolicyAlgo):
             log["Policy_Grad_Norms"] = info["policy_grad_norms"]
         return log
 
-    def get_action(self, obs_dict, goal_dict=None):
+    def get_action(self, obs_dict, goal_dict=None, **kwargs):
         """
         Get policy action outputs.
 
@@ -534,7 +537,7 @@ class BC_RNN(BC):
         # this minimizes the amount of data transferred to GPU
         return TensorUtils.to_float(TensorUtils.to_device(input_batch, self.device))
 
-    def get_action(self, obs_dict, goal_dict=None):
+    def get_action(self, obs_dict, goal_dict=None, **kwargs):
         """
         Get policy action outputs.
 
@@ -557,9 +560,12 @@ class BC_RNN(BC):
                 self._open_loop_obs = TensorUtils.clone(TensorUtils.detach(obs_dict))
 
         obs_to_use = obs_dict
+
         if self._rnn_is_open_loop:
             # replace current obs with last recorded obs
             obs_to_use = self._open_loop_obs
+
+        agentview_image = torch.clone(obs_to_use['agentview_image']).detach().cpu().numpy().squeeze().transpose((1,2,0))
 
         self._rnn_counter += 1
         action, self._rnn_hidden_state = self.nets["policy"].forward_step(
@@ -755,7 +761,7 @@ class BC_Transformer(BC):
             predictions["actions"] = predictions["actions"][:, -1, :]
         return predictions
 
-    def get_action(self, obs_dict, goal_dict=None):
+    def get_action(self, obs_dict, goal_dict=None, **kwargs):
         """
         Get policy action outputs.
         Args:
@@ -765,7 +771,8 @@ class BC_Transformer(BC):
             action (torch.Tensor): action tensor
         """
         assert not self.nets.training
-
+        if kwargs["return_action_sequence"]:
+            return self.nets["policy"](obs_dict, actions=None, goal_dict=goal_dict)
         return self.nets["policy"](obs_dict, actions=None, goal_dict=goal_dict)[:, -1, :]
 
 

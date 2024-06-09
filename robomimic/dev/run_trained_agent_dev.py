@@ -68,10 +68,127 @@ import robomimic.utils.torch_utils as TorchUtils
 import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.obs_utils as ObsUtils
 from robomimic.envs.env_base import EnvBase
+from robomimic.envs.wrappers import EnvWrapper
 from robomimic.algo import RolloutPolicy
 from collections import defaultdict
 import pandas as pd
 
+from speed_up_demo import aggregate_delta_actions, DELTA_ACTION_MAGNITUDE_LIMIT, SCALE_ACTION_LIMIT
+
+
+def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None):
+    assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
+    assert isinstance(policy, RolloutPolicy)
+    assert not (render and (video_writer is not None))
+
+    policy.start_episode()
+    obs = env.reset()
+    state_dict = env.get_state()
+
+    # hack that is necessary for robosuite tasks for deterministic action playback
+    obs = env.reset_to(state_dict)
+
+    results = {}
+    video_count = 0  # video frame counter
+    total_reward = 0.
+    traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
+    total_inference_time = 0
+
+    start = time.time()
+
+    rollout_length = policy.policy.algo_config.rnn.horizon
+
+    num_actual_actions = 0
+
+    # TODO move this somewhere that makes sense or pass in as an arg
+
+    if return_obs:
+        # store observations too
+        traj.update(dict(obs=[], next_obs=[]))
+    try:
+        for step_i in range(horizon):
+
+            # get action from policy
+            start = time.time()
+
+            actions = []
+            for i in range(rollout_length):
+                act = policy(ob=obs)
+                actions.append(act)
+            total_inference_time += time.time() - start
+
+            agg_actions = aggregate_delta_actions(actions)
+
+            # play action
+
+            # for act in agg_actions:
+            #     num_actual_actions += 1
+            #     next_obs, r, done, _ = env.step(act)
+
+            for act in actions:
+                num_actual_actions += 1
+                next_obs, r, done, _ = env.step(act)
+
+            # compute reward
+            total_reward += r
+            success = env.is_success()["task"]
+
+            # visualization
+            if render:
+                env.render(mode="human", camera_name=camera_names[0])
+            if video_writer is not None:
+                if video_count % video_skip == 0:
+                    video_img = []
+                    for cam_name in camera_names:
+                        video_img.append(env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                    video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                    video_writer.append_data(video_img)
+                video_count += 1
+
+            # collect transition
+            traj["actions"].append(act)
+            traj["rewards"].append(r)
+            traj["dones"].append(done)
+            traj["states"].append(state_dict["states"])
+            if return_obs:
+                # Note: We need to "unprocess" the observations to prepare to write them to dataset.
+                #       This includes operations like channel swapping and float to uint8 conversion
+                #       for saving disk space.
+                traj["obs"].append(ObsUtils.unprocess_obs_dict(obs))
+                traj["next_obs"].append(ObsUtils.unprocess_obs_dict(next_obs))
+
+            # break if done or if success
+            if done or success:
+                break
+
+            # update for next iter
+            obs = deepcopy(next_obs)
+            state_dict = env.get_state()
+
+
+    except env.rollout_exceptions as e:
+        print("WARNING: got rollout exception {}".format(e))
+
+    total_time_taken = time.time() - start
+
+    stats = dict(Return=total_reward, Horizon=num_actual_actions, Success_Rate=float(success), Time_Taken_in_rollout= total_time_taken)
+
+    if return_obs:
+        # convert list of dict to dict of list for obs dictionaries (for convenient writes to hdf5 dataset)
+        traj["obs"] = TensorUtils.list_of_flat_dict_to_dict_of_list(traj["obs"])
+        traj["next_obs"] = TensorUtils.list_of_flat_dict_to_dict_of_list(traj["next_obs"])
+
+    # list to numpy array
+    for k in traj:
+        if k == "initial_state_dict":
+            continue
+        if isinstance(traj[k], dict):
+            for kp in traj[k]:
+                traj[k][kp] = np.array(traj[k][kp])
+        else:
+            traj[k] = np.array(traj[k])
+
+    return stats, traj
 
 def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None):
     """
@@ -95,9 +212,16 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
         stats (dict): some statistics for the rollout - such as return, horizon, and task success
         traj (dict): dictionary that corresponds to the rollout trajectory
     """
-    assert isinstance(env, EnvBase)
+    assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
     assert isinstance(policy, RolloutPolicy)
     assert not (render and (video_writer is not None))
+
+    # Set some stuff for bc_rnn
+
+    if policy.policy.algo_config.rnn.enabled:
+        if policy.policy.algo_config.rnn.open_loop:
+            return rollout_open_loop_bc_rnn(policy, env, horizon, render, video_writer, video_skip, return_obs, camera_names)
+
 
     policy.start_episode()
     obs = env.reset()
@@ -111,6 +235,9 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     total_reward = 0.
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     total_inference_time = 0
+
+    #TODO move this somewhere that makes sense or pass in as an arg
+    kw_args = {"return_action_sequence" : False}
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
@@ -119,11 +246,32 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 
             # get action from policy
             start = time.time()
-            act = policy(ob=obs)
+            act = policy(ob=obs, **kw_args)
             total_inference_time += time.time() - start
 
             # play action
-            next_obs, r, done, _ = env.step(act)
+
+            # TODO for now, we step through an action sequence here, maybe move it to the env_wrapper later
+            if kw_args['return_action_sequence']:
+                for i in range(1):
+                    single_act = act[i]
+                    next_obs, r, done, _ = env.step(single_act)
+                    if video_writer is not None:
+                        if video_count % video_skip == 0:
+                            video_img = []
+                            for cam_name in camera_names:
+                                video_img.append(
+                                    env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                            video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                            video_writer.append_data(video_img)
+                        video_count += 1
+                    if done:
+                        break
+
+                # single_act = act[0]
+                # next_obs, r, done, _ = env.step(single_act)
+            else:
+                next_obs, r, done, _ = env.step(act)
 
             # compute reward
             total_reward += r
@@ -160,8 +308,6 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
             # update for next iter
             obs = deepcopy(next_obs)
             state_dict = env.get_state()
-
-
 
 
     except env.rollout_exceptions as e:
@@ -204,9 +350,16 @@ def run_trained_agent(args):
     # restore policy
     policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=True)
 
-    # TODO arbitrarily doubling control freq here
-    ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
+    # TODO setting control freq here
+    if args.control_freq is not None:
+        ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
     print()
+
+    # TODO setting some scaling things here
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
 
     # read rollout settings
     rollout_num_episodes = args.n_rollouts
@@ -244,8 +397,10 @@ def run_trained_agent(args):
 
     rollout_stats = []
     start = time.time()
-    print(f"Evaluating control frequency: {args.control_freq}")
+    c_freq = ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"]
+    print(f"Evaluating control frequency: {c_freq}")
     for i in range(rollout_num_episodes):
+        start_episode = time.time()
         stats, traj = rollout(
             policy=policy, 
             env=env, 
@@ -256,6 +411,7 @@ def run_trained_agent(args):
             return_obs=(write_dataset and args.dataset_obs),
             camera_names=args.camera_names,
         )
+        stats["time_taken_in_run_agent"] = time.time() - start_episode
         rollout_stats.append(stats)
 
         if write_dataset:
@@ -277,12 +433,16 @@ def run_trained_agent(args):
             total_samples += traj["actions"].shape[0]
 
     rollout_stats = TensorUtils.list_of_flat_dict_to_dict_of_list(rollout_stats)
+
+    if args.rollout_stats_path is not None:
+        df = pd.DataFrame(rollout_stats)
+        df.to_excel(args.rollout_stats_path)
     avg_rollout_stats = { k : np.mean(rollout_stats[k]) for k in rollout_stats }
     avg_rollout_stats["Num_Success"] = np.sum(rollout_stats["Success_Rate"])
+    avg_rollout_stats[f"Time for {rollout_num_episodes} demos"] = time.time() - start
+
     print("Average Rollout Stats")
     print(json.dumps(avg_rollout_stats, indent=4))
-
-    avg_rollout_stats[f"Time for {rollout_num_episodes} demos"] = time.time() - start
 
     if write_video:
         video_writer.close()
@@ -328,7 +488,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/home/nadun/Data/phd_project/robomimic/bc_trained_models/lift_bc_rnn_image_seq_10_rerun/20240517200334/models/model_epoch_100.pth",
+        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/lift_bc_rnn_image_seq_10_open_loop/20240606202957/models/model_epoch_250.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )
@@ -417,7 +577,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--control_freq",
         type=int,
-        default=20,
+        default=None,
         help="how fast to run robot",
     )
     parser.add_argument(
@@ -426,9 +586,17 @@ if __name__ == "__main__":
         help="whether to evaluate model over different control frequencies"
     )
 
+    parser.add_argument(
+        '--rollout_stats_path',
+        type=str,
+        default=None,
+        help="Where to save the rollout stats to, as a pandas dataframe"
+    )
+
 
     args = parser.parse_args()
     # args.evaluate_control_freqs = True
+    # args.render = True
 
     if args.evaluate_control_freqs:
         evaluate_over_control_freqs(args)

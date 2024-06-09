@@ -16,10 +16,10 @@ from robomimic.envs.env_base import EnvBase
 import nexusformat.nexus as nx
 
 ### Setup some constants
-DELTA_ACTION__MAGNITUDE_LIMIT = 3.0
+DELTA_ACTION_MAGNITUDE_LIMIT = 1.0
 DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
 DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
-SCALE_ACTION_LIMIT = 0.15
+SCALE_ACTION_LIMIT = 0.05
 
 
 
@@ -41,8 +41,8 @@ demo_file = h5py.File(demo_fn)
 env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
 
 ### Resetting controller max control input and output here
-env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION__MAGNITUDE_LIMIT
-env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION__MAGNITUDE_LIMIT
+env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
+env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
 
 env_meta['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
 env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
@@ -71,14 +71,15 @@ ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
 actions = demo["actions"][:]
 print()
 
-def aggregate_delta_actions(demo):
-    actions = demo["actions"][:]
+def aggregate_delta_actions(actions):
 
+    actions = np.array(actions)
     agg_actions = []
     curr_action = actions[0]
 
+
     for i in range(1, actions.shape[0]):
-        if sum(np.abs(curr_action[0:3])) > DELTA_ACTION__MAGNITUDE_LIMIT:
+        if sum(np.abs(curr_action[0:3])) > DELTA_ACTION_MAGNITUDE_LIMIT:
             agg_actions.append(curr_action)
             curr_action = actions[i]
             continue
@@ -136,7 +137,7 @@ def replay_by_aggregating(demo_file, limit, video_fn=None):
         env.reset()
         env.reset_to(initial_state)
 
-        agg_actions = aggregate_delta_actions(demo)  # action is [dpos, drot, gripper] where dpos and drot are vectors of size 3
+        agg_actions = aggregate_delta_actions(demo["actions"][:])  # action is [dpos, drot, gripper] where dpos and drot are vectors of size 3
         num_agg_actions += len(agg_actions)
 
         start = time.time()
@@ -308,12 +309,12 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
     print(f"Time take normal: {time_taken}")
     print(f"Num normal actions: {num_actions}")
 
+if __name__ == "__main__":
 
-
-### execute functions
-replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_3_100.mp4")
-replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
-# replay_normal_speed(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_2_100.mp4")
+    ### execute functions
+    replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_3_100.mp4")
+    replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
+    # replay_normal_speed(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_2_100.mp4")
 
 
 

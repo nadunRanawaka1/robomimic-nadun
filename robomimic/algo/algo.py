@@ -510,7 +510,7 @@ class RolloutPolicy(object):
         """Pretty print network description"""
         return self.policy.__repr__()
 
-    def __call__(self, ob, goal=None):
+    def __call__(self, ob, goal=None, **kwargs):
         """
         Produce action from raw observation dict (and maybe goal dict) from environment.
 
@@ -522,5 +522,7 @@ class RolloutPolicy(object):
         ob = self._prepare_observation(ob)
         if goal is not None:
             goal = self._prepare_observation(goal)
-        ac = self.policy.get_action(obs_dict=ob, goal_dict=goal)
+
+        ## TODO adding in kwargs for action sequence, make this more robust later
+        ac = self.policy.get_action(obs_dict=ob, goal_dict=goal, **kwargs)
         return TensorUtils.to_numpy(ac[0])
