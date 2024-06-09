@@ -41,6 +41,12 @@ def get_env_class(env_meta=None, env_type=None, env=None):
     elif env_type == EB.EnvType.IG_MOMART_TYPE:
         from robomimic.envs.env_ig_momart import EnvGibsonMOMART
         return EnvGibsonMOMART
+    elif env_type == EB.EnvType.REAL_TYPE:
+        from robomimic.envs.env_real_panda import EnvRealPanda
+        return EnvRealPanda
+    elif env_type == EB.EnvType.GPRS_REAL_TYPE:
+        from robomimic.envs.env_real_panda_gprs import EnvRealPandaGPRS
+        return EnvRealPandaGPRS
     raise Exception("code should never reach this point")
 
 
@@ -137,13 +143,46 @@ def is_robosuite_env(env_meta=None, env_type=None, env=None):
     return check_env_type(type_to_check=EB.EnvType.ROBOSUITE_TYPE, env_meta=env_meta, env_type=env_type, env=env)
 
 
+def is_simpler_env(env_meta=None, env_type=None, env=None):
+    return False
+
+
+def is_simpler_ov_env(env_meta=None, env_type=None, env=None):
+    return False
+
+
+def is_factory_env(env_meta=None, env_type=None, env=None):
+    return False
+
+
+def is_furniture_sim_env(env_meta=None, env_type=None, env=None):
+    return False
+
+
+def is_real_robot_env(env_meta=None, env_type=None, env=None):
+    """
+    Determines whether the environment is a real robot environment. Accepts
+    either env_meta, env_type, or env.
+    """
+    return check_env_type(type_to_check=EB.EnvType.REAL_TYPE, env_meta=env_meta, env_type=env_type, env=env)
+
+
+def is_real_robot_gprs_env(env_meta=None, env_type=None, env=None):
+    """
+    Determines whether the environment is a real robot environment. Accepts
+    either env_meta, env_type, or env.
+    """
+    return check_env_type(type_to_check=EB.EnvType.GPRS_REAL_TYPE, env_meta=env_meta, env_type=env_type, env=env)
+
+
 def create_env(
     env_type,
-    env_name,  
+    env_name,
+    env_class=None,
     render=False, 
     render_offscreen=False, 
     use_image_obs=False, 
-    use_depth_obs=False, 
+    use_depth_obs=False,
     **kwargs,
 ):
     """
@@ -170,7 +209,8 @@ def create_env(
     """
 
     # note: pass @postprocess_visual_obs True, to make sure images are processed for network inputs
-    env_class = get_env_class(env_type=env_type)
+    if env_class is None:
+        env_class = get_env_class(env_type=env_type)
     env = env_class(
         env_name=env_name, 
         render=render, 
@@ -187,11 +227,12 @@ def create_env(
 
 def create_env_from_metadata(
     env_meta,
-    env_name=None,  
+    env_name=None,
+    env_class=None,
     render=False, 
     render_offscreen=False, 
     use_image_obs=False, 
-    use_depth_obs=False, 
+    use_depth_obs=False,
 ):
     """
     Create environment.
@@ -225,14 +266,17 @@ def create_env_from_metadata(
         env_name = env_meta["env_name"]
     env_type = get_env_type(env_meta=env_meta)
     env_kwargs = env_meta["env_kwargs"]
+    env_kwargs.pop("use_image_obs", None)
+    env_kwargs.pop("use_depth_obs", None)
 
     env = create_env(
         env_type=env_type,
         env_name=env_name,  
-        render=render, 
+        env_class=env_class,
+        render=render,
         render_offscreen=render_offscreen, 
         use_image_obs=use_image_obs, 
-        use_depth_obs=use_depth_obs, 
+        use_depth_obs=use_depth_obs,
         **env_kwargs,
     )
     check_env_version(env, env_meta)
@@ -246,10 +290,10 @@ def create_env_for_data_processing(
     camera_width, 
     reward_shaping,
     env_class=None,
-    render=None, 
-    render_offscreen=None, 
-    use_image_obs=None, 
-    use_depth_obs=None, 
+    render=None,
+    render_offscreen=None,
+    use_image_obs=None,
+    use_depth_obs=None,
 ):
     """
     Creates environment for processing dataset observations and rewards.
@@ -303,9 +347,9 @@ def create_env_for_data_processing(
         camera_height=camera_height, 
         camera_width=camera_width, 
         reward_shaping=reward_shaping, 
-        render=render, 
-        render_offscreen=render_offscreen, 
-        use_image_obs=use_image_obs, 
+        render=render,
+        render_offscreen=render_offscreen,
+        use_image_obs=use_image_obs,
         use_depth_obs=use_depth_obs,
         **env_kwargs,
     )
