@@ -76,7 +76,7 @@ import pandas as pd
 from speed_up_demo import aggregate_delta_actions, DELTA_ACTION_MAGNITUDE_LIMIT, SCALE_ACTION_LIMIT
 
 
-def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None):
+def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
     assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
     assert isinstance(policy, RolloutPolicy)
     assert not (render and (video_writer is not None))
@@ -94,13 +94,11 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     total_inference_time = 0
 
-    start = time.time()
+    start_rollout = time.time()
 
     rollout_length = policy.policy.algo_config.rnn.horizon
-
     num_actual_actions = 0
 
-    # TODO move this somewhere that makes sense or pass in as an arg
 
     if return_obs:
         # store observations too
@@ -112,22 +110,31 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
             start = time.time()
 
             actions = []
-            for i in range(rollout_length):
+            if kw_args["return_action_sequence"]:
+                for i in range(rollout_length):
+                    act = policy(ob=obs)
+                    actions.append(act)
+            else:
                 act = policy(ob=obs)
                 actions.append(act)
             total_inference_time += time.time() - start
 
-            agg_actions = aggregate_delta_actions(actions)
+            if kw_args["aggregate_actions"]:
+                agg_actions = aggregate_delta_actions(actions)
 
-            # play action
-
-            # for act in agg_actions:
-            #     num_actual_actions += 1
-            #     next_obs, r, done, _ = env.step(act)
-
-            for act in actions:
-                num_actual_actions += 1
-                next_obs, r, done, _ = env.step(act)
+                # play aggregate actions
+                for act in agg_actions:
+                    num_actual_actions += 1
+                    next_obs, r, done, _ = env.step(act)
+                    if done:
+                        break
+            else:
+                # play regular actions
+                for act in actions:
+                    num_actual_actions += 1
+                    next_obs, r, done, _ = env.step(act)
+                    if done:
+                        break
 
             # compute reward
             total_reward += r
@@ -169,7 +176,7 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
     except env.rollout_exceptions as e:
         print("WARNING: got rollout exception {}".format(e))
 
-    total_time_taken = time.time() - start
+    total_time_taken = time.time() - start_rollout
 
     stats = dict(Return=total_reward, Horizon=num_actual_actions, Success_Rate=float(success), Time_Taken_in_rollout= total_time_taken)
 
@@ -190,7 +197,143 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
 
     return stats, traj
 
-def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None):
+
+def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
+    assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
+    assert isinstance(policy, RolloutPolicy)
+    assert not (render and (video_writer is not None))
+
+    policy.start_episode()
+    obs = env.reset()
+    state_dict = env.get_state()
+
+    # hack that is necessary for robosuite tasks for deterministic action playback
+    obs = env.reset_to(state_dict)
+
+    results = {}
+    video_count = 0  # video frame counter
+    total_reward = 0.
+    traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
+    total_inference_time = 0
+    num_actual_actions = 0
+
+    start_rollout = time.time()
+
+    if return_obs:
+        # store observations too
+        traj.update(dict(obs=[], next_obs=[]))
+    try:
+        for step_i in range(horizon):
+
+            # get action from policy
+            start = time.time()
+            act = policy(ob=obs, **kw_args)
+            total_inference_time += time.time() - start
+
+            # play action
+
+            # TODO for now, we aggregate the action sequence and step through it here
+            if kw_args['return_action_sequence']:
+                if kw_args['aggregate_actions']:
+                    # Play aggregated actions
+                    agg_actions = aggregate_delta_actions(act)
+                    for act in agg_actions:
+                        next_obs, r, done, _ = env.step(act)
+                        num_actual_actions += 1
+                        if video_writer is not None:
+                            if video_count % video_skip == 0:
+                                video_img = []
+                                for cam_name in camera_names:
+                                    video_img.append(
+                                        env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                                video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                                video_writer.append_data(video_img)
+                            video_count += 1
+                        if done:
+                            break
+                else:
+                    # Play normal actions
+                    for i in range(act.shape[0]):
+                        a = act[i]
+                        next_obs, r, done, _ = env.step(a)
+                        num_actual_actions += 1
+                        if video_writer is not None:
+                            if video_count % video_skip == 0:
+                                video_img = []
+                                for cam_name in camera_names:
+                                    video_img.append(
+                                        env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                                video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                                video_writer.append_data(video_img)
+                            video_count += 1
+                        if done:
+                            break
+
+            else:
+                # Model returns a single action, play it here
+                next_obs, r, done, _ = env.step(act)
+                num_actual_actions += 1
+
+            # compute reward
+            total_reward += r
+            success = env.is_success()["task"]
+
+            # visualization
+            if render:
+                env.render(mode="human", camera_name=camera_names[0])
+            if video_writer is not None:
+                if video_count % video_skip == 0:
+                    video_img = []
+                    for cam_name in camera_names:
+                        video_img.append(env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                    video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                    video_writer.append_data(video_img)
+                video_count += 1
+
+            # collect transition
+            traj["actions"].append(act)
+            traj["rewards"].append(r)
+            traj["dones"].append(done)
+            traj["states"].append(state_dict["states"])
+            if return_obs:
+                # Note: We need to "unprocess" the observations to prepare to write them to dataset.
+                #       This includes operations like channel swapping and float to uint8 conversion
+                #       for saving disk space.
+                traj["obs"].append(ObsUtils.unprocess_obs_dict(obs))
+                traj["next_obs"].append(ObsUtils.unprocess_obs_dict(next_obs))
+
+            # break if done or if success
+            if done or success:
+                break
+
+            # update for next iter
+            obs = deepcopy(next_obs)
+            state_dict = env.get_state()
+
+
+    except env.rollout_exceptions as e:
+        print("WARNING: got rollout exception {}".format(e))
+
+    stats = dict(Return=total_reward, Horizon=num_actual_actions, Success_Rate=float(success), Time_Taken_in_rollout = time.time() - start_rollout)
+
+    if return_obs:
+        # convert list of dict to dict of list for obs dictionaries (for convenient writes to hdf5 dataset)
+        traj["obs"] = TensorUtils.list_of_flat_dict_to_dict_of_list(traj["obs"])
+        traj["next_obs"] = TensorUtils.list_of_flat_dict_to_dict_of_list(traj["next_obs"])
+
+    # list to numpy array
+    for k in traj:
+        if k == "initial_state_dict":
+            continue
+        if isinstance(traj[k], dict):
+            for kp in traj[k]:
+                traj[k][kp] = np.array(traj[k][kp])
+        else:
+            traj[k] = np.array(traj[k])
+
+    return stats, traj
+
+def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
     """
     Helper function to carry out rollouts. Supports on-screen rendering, off-screen rendering to a video, 
     and returns the rollout trajectory.
@@ -216,11 +359,14 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     assert isinstance(policy, RolloutPolicy)
     assert not (render and (video_writer is not None))
 
-    # Set some stuff for bc_rnn
+    # Use separate function to rollout open loop bc rnn and diffusion policy TODO make this more robust
 
-    if policy.policy.algo_config.rnn.enabled:
-        if policy.policy.algo_config.rnn.open_loop:
-            return rollout_open_loop_bc_rnn(policy, env, horizon, render, video_writer, video_skip, return_obs, camera_names)
+    if (policy.policy.global_config.ALGO_NAME == "bc"):
+        if policy.policy.algo_config.rnn.enabled:
+            if policy.policy.algo_config.rnn.open_loop:
+                return rollout_open_loop_bc_rnn(policy, env, horizon, render, video_writer, video_skip, return_obs, camera_names, **kw_args)
+    elif (policy.policy.global_config.ALGO_NAME == "diffusion_policy"):
+        return rollout_diffusion_policy(policy, env, horizon, render, video_writer, video_skip, return_obs, camera_names, **kw_args)
 
 
     policy.start_episode()
@@ -236,8 +382,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     total_inference_time = 0
 
-    #TODO move this somewhere that makes sense or pass in as an arg
-    kw_args = {"return_action_sequence" : False}
+
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
@@ -361,6 +506,9 @@ def run_trained_agent(args):
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
 
+    # TODO setting kw_args for rollout here
+    kw_args = {"return_action_sequence": True, "aggregate_actions": True}
+
     # read rollout settings
     rollout_num_episodes = args.n_rollouts
     rollout_horizon = args.horizon
@@ -410,6 +558,7 @@ def run_trained_agent(args):
             video_skip=args.video_skip, 
             return_obs=(write_dataset and args.dataset_obs),
             camera_names=args.camera_names,
+            **kw_args
         )
         stats["time_taken_in_run_agent"] = time.time() - start_episode
         rollout_stats.append(stats)
@@ -488,7 +637,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/lift_bc_rnn_image_seq_10_open_loop/20240606202957/models/model_epoch_250.pth",
+        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/lift_image_diffusion_policy/20240609000333/models/model_epoch_600.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )

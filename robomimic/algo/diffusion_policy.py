@@ -265,7 +265,7 @@ class DiffusionPolicyUNet(PolicyAlgo):
         self.obs_queue = obs_queue
         self.action_queue = action_queue
     
-    def get_action(self, obs_dict, goal_dict=None):
+    def get_action(self, obs_dict, goal_dict=None, **kwargs):
         """
         Get policy action outputs.
 
@@ -300,6 +300,11 @@ class DiffusionPolicyUNet(PolicyAlgo):
             
             # put actions into the queue
             self.action_queue.extend(action_sequence[0])
+
+        if kwargs["return_action_sequence"]:
+            Ta = self.algo_config.horizon.action_horizon
+            self.action_queue = deque(maxlen=Ta)
+            return action_sequence
         
         # has action, execute from left to right
         # [Da]

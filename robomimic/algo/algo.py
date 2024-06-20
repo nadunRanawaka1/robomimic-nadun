@@ -558,6 +558,7 @@ class RolloutPolicy(object):
             goal = self._prepare_observation(goal)
 
         ## TODO adding in kwargs for action sequence, make this more robust later
+        # TODO if we get a sequence of actions from the policy, make sure to unnormalize the whole sequence properly
         ac = self.policy.get_action(obs_dict=ob, goal_dict=goal, **kwargs)
         ac = TensorUtils.to_numpy(ac[0])
         if self.action_normalization_stats is not None:

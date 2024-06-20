@@ -12,6 +12,7 @@ import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.file_utils as FileUtils
 import robomimic.utils.env_utils as EnvUtils
 import robomimic.utils.obs_utils as ObsUtils
+import robomimic.utils.transform_utils as TransformUtils
 from robomimic.envs.env_base import EnvBase
 import nexusformat.nexus as nx
 
@@ -23,7 +24,7 @@ SCALE_ACTION_LIMIT = 0.05
 
 
 
-demo_fn = "/home/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141.hdf5"
+demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141_copy.hdf5"
 
 # demo = nx.nxload(demo_fn)
 # print(demo.tree)
@@ -278,7 +279,13 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
         env.reset()
         env.reset_to(initial_state)
 
-        actions = demo['actions'][:]  # action is [dpos, drot, gripper] where dpos and drot are vectors of size 3
+        actions = demo['absolute_actions'][:]  # action is [dpos, drot, gripper] where dpos and drot are vectors of size 3
+
+        ee_pos = demo['obs/robot0_eef_pos'][:]
+        ee_quat = demo['obs/robot0_eef_quat'][:]
+
+
+
         start = time.time()
 
         if video_fn is not None:
@@ -290,6 +297,10 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
 
         for i in range(n):
             act = actions[i]
+            pos = ee_pos[i]
+            quat = ee_quat[i]
+
+            act = TransformUtils.absolute_action_to_delta(act, pos, quat)
 
             next_obs, _, _, _ = env.step(act)
             # env.render()
@@ -312,9 +323,9 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
 if __name__ == "__main__":
 
     ### execute functions
-    replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_3_100.mp4")
-    replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
-    # replay_normal_speed(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_2_100.mp4")
+    # replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_3_100.mp4")
+    # replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
+    replay_normal_speed(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_2_100.mp4")
 
 
 
