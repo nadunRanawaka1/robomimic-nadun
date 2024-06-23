@@ -647,6 +647,7 @@ def evaluate_aggregated_actions(args):
     DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
     DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
     SCALE_ACTION_LIMITS = [0.05, 0.10, 0.15, 0.20]
+    kp_values = [100 + i*10 for i in range(21)]
 
     kw_args = {"return_action_sequence": True, "aggregate_actions": True, "DELTA_ACTION_DIRECTION_THRESHOLD": 0.25,
                "DELTA_EPSILON": np.array([1e-7, 1e-7, 1e-7])}
