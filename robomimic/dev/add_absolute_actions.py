@@ -25,9 +25,9 @@ def delta_axis_angle_to_absolute(delta_angles, quats):
     return np.array(ret)
 
 
-demo_fn  = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141_copy.hdf5"
-demo = nx.nxload(demo_fn)
-print(demo.tree)
+demo_fn  = "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/tool_hang/ph/all_obs_v141.hdf5"
+# demo = nx.nxload(demo_fn)
+# print(demo.tree)
 
 demo_f = h5py.File(demo_fn, "a")
 demo_file = demo_f['data']
@@ -54,8 +54,6 @@ for demo in demo_file:
 
     demo.create_dataset("absolute_actions", data=absolute_actions)
 
-
-    print()
 
 
 demo_f.close()

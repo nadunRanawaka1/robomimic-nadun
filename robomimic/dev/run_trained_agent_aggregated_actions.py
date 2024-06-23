@@ -648,9 +648,21 @@ def evaluate_aggregated_actions(args):
     DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
     SCALE_ACTION_LIMITS = [0.05, 0.10, 0.15, 0.20]
 
+    kw_args = {"return_action_sequence": False, "aggregate_actions": False, "DELTA_ACTION_DIRECTION_THRESHOLD": 0.25,
+               "DELTA_EPSILON": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05, "DELTA_ACTION_MAGNITUDE_LIMIT": 1.0}
+
+    # Test non-aggregated first
+    args.video_path = f"{args.video_dir}/non_aggregated_actions.mp4"
+    avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
+    rollout_stats["action_magnitude_limit"] = [-1 for i in range(args.n_rollouts)]
+    
+
+    df = pd.DataFrame(rollout_stats)
+
+    # Now test the aggregated actions
     kw_args = {"return_action_sequence": True, "aggregate_actions": True, "DELTA_ACTION_DIRECTION_THRESHOLD": 0.25,
-               "DELTA_EPSILON": np.array([1e-7, 1e-7, 1e-7])}
-    df = None
+               "DELTA_EPSILON": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05, "DELTA_ACTION_MAGNITUDE_LIMIT": 1.0}
+
     for idx, limit in enumerate(SCALE_ACTION_LIMITS):
 
         kw_args["SCALE_ACTION_LIMIT"] = limit
@@ -819,7 +831,7 @@ if __name__ == "__main__":
         args.video_dir = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'videos'))
 
     if args.rollout_stats_path is None:
-        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'multi_eval_stats.xlsx'))
+        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'multi_eval_stats_new.xlsx'))
 
     # if args.evaluate_control_freqs:
     #     evaluate_over_control_freqs(args)
