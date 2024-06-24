@@ -20,7 +20,7 @@ import nexusformat.nexus as nx
 DELTA_ACTION_MAGNITUDE_LIMIT = 1.0
 DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
 DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
-SCALE_ACTION_LIMIT = 0.05
+SCALE_ACTION_LIMIT = [0.05, 0.05, 0.05, 0.5, 0.5, 0.5]
 
 
 
@@ -42,11 +42,12 @@ demo_file = h5py.File(demo_fn)
 env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
 
 ### Resetting controller max control input and output here
-env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
-env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
-
-env_meta['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
-env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
+# env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
+# env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
+#
+# env_meta['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
+# env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
+env_meta['env_kwargs']['controller_configs']['control_delta'] = False
 
 env = EnvUtils.create_env_from_metadata(env_meta,
                                         render=True,
@@ -285,7 +286,6 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
         ee_quat = demo['obs/robot0_eef_quat'][:]
 
 
-
         start = time.time()
 
         if video_fn is not None:
@@ -299,8 +299,15 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
             act = actions[i]
             pos = ee_pos[i]
             quat = ee_quat[i]
+            # axis, angle = TransformUtils.quat2axisangle(quat)
+            # aa = TransformUtils.axisangle2vec(axis, angle)
+            # act[0:3] = pos
+            # act[3:6] = aa
 
-            act = TransformUtils.absolute_action_to_delta(act, pos, quat)
+            #
+            # act = TransformUtils.absolute_action_to_delta(act, pos, quat)
+
+
 
             next_obs, _, _, _ = env.step(act)
             # env.render()
@@ -325,7 +332,7 @@ if __name__ == "__main__":
     ### execute functions
     # replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_3_100.mp4")
     # replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
-    replay_normal_speed(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_2_100.mp4")
+    replay_normal_speed(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_10_absolute_actions_method_1.mp4")
 
 
 

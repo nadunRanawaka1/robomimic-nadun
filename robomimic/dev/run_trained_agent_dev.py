@@ -501,13 +501,13 @@ def run_trained_agent(args):
     print()
 
     # TODO setting some scaling things here
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
+    # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
+    # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
+    # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
+    # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
 
     # TODO setting kw_args for rollout here
-    kw_args = {"return_action_sequence": True, "aggregate_actions": True}
+    kw_args = {"return_action_sequence": False, "aggregate_actions": False}
 
     # read rollout settings
     rollout_num_episodes = args.n_rollouts

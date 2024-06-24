@@ -536,8 +536,8 @@ def run_trained_agent(args, **kw_args):
     # TODO setting some scaling things here
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = - kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"]
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] = - kw_args["SCALE_ACTION_LIMIT"]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = kw_args["SCALE_ACTION_LIMIT"]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] =  [kw_args["SCALE_ACTION_LIMIT"] * -1 for i in range(3)] + [kw_args["SCALE_ACTION_LIMIT"] * -10 for i in range(3)]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = [kw_args["SCALE_ACTION_LIMIT"] * 1 for i in range(3)] + [kw_args["SCALE_ACTION_LIMIT"] * 10 for i in range(3)]
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['kp'] = kw_args["kp"]
 
     # read rollout settings
@@ -660,28 +660,29 @@ def evaluate_aggregated_actions(args):
 
     # Now test the aggregated actions
     kw_args = {"return_action_sequence": True, "aggregate_actions": True, "DELTA_ACTION_DIRECTION_THRESHOLD": 0.25,
-               "DELTA_EPSILON": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05, "DELTA_ACTION_MAGNITUDE_LIMIT": 1.0}
+               "DELTA_EPSILON": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05,
+               "DELTA_ACTION_MAGNITUDE_LIMIT": 1.0, "kp": 150}
 
     for idx, limit in enumerate(SCALE_ACTION_LIMITS):
 
         kw_args["SCALE_ACTION_LIMIT"] = limit
         kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"] = DELTA_ACTION_MAGNITUDE_LIMITS[idx]
 
-        # if args.video_dir is not None:
-        #     args.video_path = f"{args.video_dir}/action_magnitude_{DELTA_ACTION_MAGNITUDE_LIMITS[idx]}.mp4"
+        if args.video_dir is not None:
+            args.video_path = f"{args.video_dir}/action_magnitude_{DELTA_ACTION_MAGNITUDE_LIMITS[idx]}_scale_fix.mp4"
 
-        for kp in kp_values:
-            kw_args["kp"] = kp
+        # for kp in kp_values:
+        #     kw_args["kp"] = kp
 
-            avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
-            rollout_stats["action_magnitude_limit"] = [DELTA_ACTION_MAGNITUDE_LIMITS[idx] for i in range(args.n_rollouts)]
-            rollout_stats["kp"] = [kp for i in range(args.n_rollouts)]
+        avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
+        rollout_stats["action_magnitude_limit"] = [DELTA_ACTION_MAGNITUDE_LIMITS[idx] for i in range(args.n_rollouts)]
+        # rollout_stats["kp"] = [kp for i in range(args.n_rollouts)]
 
-            if df is None:
-                df = pd.DataFrame(rollout_stats)
-            else:
-                new_df = pd.DataFrame(rollout_stats)
-                df = pd.concat([df, new_df], ignore_index=True)
+        if df is None:
+            df = pd.DataFrame(rollout_stats)
+        else:
+            new_df = pd.DataFrame(rollout_stats)
+            df = pd.concat([df, new_df], ignore_index=True)
 
     if args.rollout_stats_path is not None:
         df.to_excel(args.rollout_stats_path)
@@ -834,7 +835,7 @@ if __name__ == "__main__":
         args.video_dir = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'videos'))
 
     if args.rollout_stats_path is None:
-        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'multi_eval_stats_with_kp.xlsx'))
+        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'multi_eval_stats_scale_fix.xlsx'))
 
     # if args.evaluate_control_freqs:
     #     evaluate_over_control_freqs(args)
