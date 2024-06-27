@@ -255,6 +255,8 @@ def replay_by_skipping(demo_file, limit, video_fn=None):
 
 def replay_normal_speed(demo_file, limit, video_fn=None):
 
+
+
     if video_fn is not None:
         video_writer = imageio.get_writer(video_fn, fps=20)
 
@@ -327,12 +329,113 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
     print(f"Time take normal: {time_taken}")
     print(f"Num normal actions: {num_actions}")
 
+
+def replay_joint_actions(demo_file, limit, video_fn):
+    demo_file = h5py.File(demo_fn)
+
+    ### Init env
+    env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
+    joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_position_nadun.json"
+    # joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
+    controller_configs = json.load(open(joint_controller_fp))
+    env_meta["env_kwargs"]["controller_configs"] = controller_configs
+
+    env = EnvUtils.create_env_from_metadata(env_meta,
+                                            render=True,
+                                            use_image_obs=True)
+
+
+
+    if video_fn is not None:
+        video_writer = imageio.get_writer(video_fn, fps=20)
+
+    counter = 0
+    normal_reward = 0
+    time_taken = 0
+    num_actions = 0
+
+    for ep in demo_file["data"]:
+
+        if counter > limit:
+            break
+        counter += 1
+
+
+        print(f"processing demo: {counter}")
+
+        demo = demo_file[f'data/{ep}']
+
+        states = demo_file["data/{}/states".format(ep)][()]
+        initial_state = dict(states=states[0])
+        initial_state["model"] = demo_file["data/{}".format(ep)].attrs["model_file"]
+
+        env.reset()
+        env.reset_to(initial_state)
+
+        actions = demo['obs/robot0_joint_pos'][:]  # action is [joint_pos, gripper] where dpos and drot are vectors of size 3
+        gripper_actions = demo['absolute_actions'][:,-1]
+        gripper_actions = np.expand_dims(gripper_actions, axis=1)
+
+        actions = np.concatenate([actions, gripper_actions], axis=1)
+
+        start = time.time()
+
+        if video_fn is not None:
+            video_img = env.env.sim.render(height=512, width=512, camera_name="agentview")[::-1]
+            video_writer.append_data(video_img)
+
+        n = actions.shape[0]
+        num_actions += n
+
+        next_obs = None
+
+        prev_act = actions[0]
+
+        joint_pos_list = []
+        for i in range(n):
+            act = np.copy(actions[i])
+
+            next_obs = env.get_observation()
+            joint_pos = next_obs["robot0_joint_pos"]
+
+            joint_pos_list.append(joint_pos)
+            # print(f"Robot joint_pos : {joint_pos} . Previous action: {prev_act}")
+
+            act[:-1] = act[:-1] - joint_pos
+            act[:-1] *= 2
+
+            next_obs, _, _, _ = env.step(act)
+
+            prev_act = act
+            # env.render()
+            if video_fn is not None:
+                video_img = env.env.sim.render(height=512, width=512, camera_name="agentview")[::-1]
+                video_writer.append_data(video_img)
+
+            # time.sleep(0.05)
+
+        time_taken += time.time() - start
+
+        joint_pos_list = np.array(joint_pos_list)
+
+        normal_reward += env.get_reward()
+
+    if video_fn is not None:
+        video_writer.close()
+    print(f"Joint position reward: {normal_reward}")
+    print(f"Time take joint position: {time_taken}")
+    print(f"Num joint position actions: {num_actions}")
+
+    print()
+
+
 if __name__ == "__main__":
 
     ### execute functions
     # replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_3_100.mp4")
     # replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
-    replay_normal_speed(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_10_absolute_actions_method_1.mp4")
+    # replay_normal_speed(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_10_absolute_actions_method_1.mp4")
+    replay_joint_actions(demo_file, 200, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_200.mp4")
 
 
 
