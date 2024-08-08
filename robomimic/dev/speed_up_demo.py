@@ -16,11 +16,7 @@ import robomimic.utils.transform_utils as TransformUtils
 from robomimic.envs.env_base import EnvBase
 import nexusformat.nexus as nx
 
-### Setup some constants
-DELTA_ACTION_MAGNITUDE_LIMIT = 1.0
-DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
-DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
-SCALE_ACTION_LIMIT = [0.05, 0.05, 0.05, 0.5, 0.5, 0.5]
+
 
 
 
