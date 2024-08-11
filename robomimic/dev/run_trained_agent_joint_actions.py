@@ -70,46 +70,11 @@ import robomimic.utils.obs_utils as ObsUtils
 from robomimic.envs.env_base import EnvBase
 from robomimic.envs.wrappers import EnvWrapper
 from robomimic.algo import RolloutPolicy
-from robomimic.dev.dev_utils import aggregate_delta_actions
 from collections import defaultdict
 import pandas as pd
 
-### Setup some constants
+# from speed_up_demo import aggregate_delta_actions, DELTA_ACTION_MAGNITUDE_LIMIT, SCALE_ACTION_LIMIT
 
-# def aggregate_delta_actions(actions, kw_args):
-#
-#     actions = np.array(actions)
-#     agg_actions = []
-#     curr_action = actions[0]
-#
-#     for i in range(1, actions.shape[0]):
-#         if sum(np.abs(curr_action[0:3])) > kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"]:
-#             agg_actions.append(curr_action)
-#             curr_action = actions[i]
-#             continue
-#
-#         ### check if current action and next action are in similar directions
-#         next_action_delta_pos = actions[i][0:3] + kw_args["DELTA_EPSILON"]
-#         # First normalize both
-#         next_action_norm = np.linalg.norm(next_action_delta_pos)
-#         next_action_delta_pos /= next_action_norm
-#         curr_action_delta_pos = np.copy(curr_action[0:3]) + kw_args["DELTA_EPSILON"]
-#         curr_action_norm = np.linalg.norm(curr_action_delta_pos)
-#         curr_action_delta_pos /= curr_action_norm
-#         # Then use dot product to check
-#         d_prod = np.dot(next_action_delta_pos, curr_action_delta_pos)
-#
-#         if d_prod < kw_args["DELTA_ACTION_DIRECTION_THRESHOLD"]: # curr action and next action are not in the same direction
-#             agg_actions.append(curr_action)
-#             curr_action = actions[i]
-#         else:
-#             curr_action[0:6] += actions[i][0:6]
-#             curr_action[-1] = actions[i][-1]
-#
-#     agg_actions.append(curr_action)
-#     return agg_actions
-
-    # return np.all(gripper_act ==
 
 def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
     assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
@@ -134,6 +99,7 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
     rollout_length = policy.policy.algo_config.rnn.horizon
     num_actual_actions = 0
 
+
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
@@ -154,7 +120,7 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
             total_inference_time += time.time() - start
 
             if kw_args["aggregate_actions"]:
-                agg_actions = aggregate_delta_actions(actions, kw_args=kw_args)
+                agg_actions = aggregate_delta_actions(actions)
 
                 # play aggregate actions
                 for act in agg_actions:
@@ -231,6 +197,7 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
 
     return stats, traj
 
+
 def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
     assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
     assert isinstance(policy, RolloutPolicy)
@@ -250,9 +217,6 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
     total_inference_time = 0
     num_actual_actions = 0
 
-    # TODO this might not be correct
-    last_gripper_act = -1.0
-    slowdown_mode = False
     start_rollout = time.time()
 
     if return_obs:
@@ -268,22 +232,11 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
 
             # play action
 
-            # TODO for now, we aggregate the action sequence and step through it here
+            # TODO this does not work yet
             if kw_args['return_action_sequence']:
                 if kw_args['aggregate_actions']:
                     # Play aggregated actions
-                    if kw_args["check_gripper"]:
-                        if slowdown_mode:
-                            agg_actions = act
-                            slowdown_mode = False
-                        if gripper_changed(act[:, -1], last_gripper_act):
-                            agg_actions = act
-                            slowdown_mode = True
-                        else:
-                            agg_actions = aggregate_delta_actions(act, kw_args)
-                    else:
-                        agg_actions = aggregate_delta_actions(act, kw_args)
-                    last_gripper_act = agg_actions[-1][-1]
+                    agg_actions = aggregate_delta_actions(act)
                     for act in agg_actions:
                         next_obs, r, done, _ = env.step(act)
                         num_actual_actions += 1
@@ -318,6 +271,10 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
 
             else:
                 # Model returns a single action, play it here
+                next_obs = env.get_observation()
+                joint_pos = next_obs["robot0_joint_pos"]
+                act[:-1] = act[:-1] - joint_pos
+                act[:-1] *= 2
                 next_obs, r, done, _ = env.step(act)
                 num_actual_actions += 1
 
@@ -429,6 +386,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     total_inference_time = 0
 
+
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
@@ -524,7 +482,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     return stats, traj
 
 
-def run_trained_agent(args, **kw_args):
+def run_trained_agent(args):
     # some arg checking
     write_video = (args.video_path is not None)
     assert not (args.render and write_video) # either on-screen or video but not both
@@ -544,14 +502,21 @@ def run_trained_agent(args, **kw_args):
     # TODO setting control freq here
     if args.control_freq is not None:
         ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
+    print()
 
+    joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_position_nadun.json"
+    # joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
+    controller_configs = json.load(open(joint_controller_fp))
 
+    ckpt_dict["env_metadata"]["env_kwargs"]["controller_configs"] = controller_configs
     # TODO setting some scaling things here
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = - kw_args["delta_action_magnitude_limit"]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = kw_args["delta_action_magnitude_limit"]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] =  [kw_args["scale_action_limit"] * -1 for i in range(3)] + [kw_args["scale_action_limit"] * -10 for i in range(3)]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = [kw_args["scale_action_limit"] * 1 for i in range(3)] + [kw_args["scale_action_limit"] * 10 for i in range(3)]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['kp'] = kw_args["kp"]
+    # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
+    # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
+    # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
+    # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
+
+    # TODO setting kw_args for rollout here
+    kw_args = {"return_action_sequence": False, "aggregate_actions": False}
 
     # read rollout settings
     rollout_num_episodes = args.n_rollouts
@@ -592,7 +557,6 @@ def run_trained_agent(args, **kw_args):
     c_freq = ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"]
     print(f"Evaluating control frequency: {c_freq}")
     for i in range(rollout_num_episodes):
-        print(f"Running rollout episode: {i}")
         start_episode = time.time()
         stats, traj = rollout(
             policy=policy, 
@@ -628,9 +592,9 @@ def run_trained_agent(args, **kw_args):
 
     rollout_stats = TensorUtils.list_of_flat_dict_to_dict_of_list(rollout_stats)
 
-    # if args.rollout_stats_path is not None:
-    #     df = pd.DataFrame(rollout_stats)
-    #     df.to_excel(args.rollout_stats_path)
+    if args.rollout_stats_path is not None:
+        df = pd.DataFrame(rollout_stats)
+        df.to_excel(args.rollout_stats_path)
     avg_rollout_stats = { k : np.mean(rollout_stats[k]) for k in rollout_stats }
     avg_rollout_stats["Num_Success"] = np.sum(rollout_stats["Success_Rate"])
     avg_rollout_stats[f"Time for {rollout_num_episodes} demos"] = time.time() - start
@@ -648,80 +612,9 @@ def run_trained_agent(args, **kw_args):
         data_writer.close()
         print("Wrote dataset trajectories to {}".format(args.dataset_path))
 
-    return avg_rollout_stats, rollout_stats
-
-def evaluate_aggregated_actions(args):
-    # TODO put these in config or pass in if necessary
-
-    delta_action_magnitude_limits = [1.0, 2.0, 3.0, 4.0]
-    delta_epsilon = np.array([1e-7, 1e-7, 1e-7])
-    delta_action_direction_threshold = 0.25
-    scale_action_limits = [0.05, 0.10, 0.15, 0.20]
-    kp_values = [100 + i*10 for i in range(21)]
-    df = None
-
-    kw_args = {"return_action_sequence": False, "aggregate_actions": False, "delta_action_direction_threshold": 0.25,
-               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05,
-               "delta_action_magnitude_limit": 1.0, "kp": 150}
-
-    ### Test non-aggregated first
-    args.video_path = f"{args.video_dir}/normal_rollout.mp4"
-    avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
-    # rollout_stats["action_magnitude_limit"] = [-1 for i in range(args.n_rollouts)]
-    #
-    # rollout_stats["kp"] = [150 for i in range(args.n_rollouts)]
-    #
-    #
-    df = pd.DataFrame(rollout_stats)
-
-    # Now test the aggregated actions
-    kw_args = {"return_action_sequence": True, "aggregate_actions": True, "delta_action_direction_threshold": 0.25,
-               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05,
-               "delta_action_magnitude_limit": 1.0, "kp": 150}
-
-    for idx, limit in enumerate(scale_action_limits):
-
-        kw_args["scale_action_limits"] = limit
-        kw_args["delta_action_magnitude_limit"] = delta_action_magnitude_limits[idx]
-
-        if args.video_dir is not None:
-            args.video_path = f"{args.video_dir}/action_magnitude_{delta_action_magnitude_limits[idx]}_scale_fix.mp4"
-
-        # for kp in kp_values:
-        #     kw_args["kp"] = kp
-
-        avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
-        rollout_stats["action_magnitude_limit"] = [delta_action_magnitude_limits[idx] for i in range(args.n_rollouts)]
-        # rollout_stats["kp"] = [kp for i in range(args.n_rollouts)]
-
-        if df is None:
-            df = pd.DataFrame(rollout_stats)
-        else:
-            new_df = pd.DataFrame(rollout_stats)
-            df = pd.concat([df, new_df], ignore_index=True)
+    return avg_rollout_stats
 
 
-    if args.rollout_stats_path is not None:
-        df.to_excel(args.rollout_stats_path)
-
-
-def evaluate_over_control_freqs(args, start_range=10, end_range=200, step=2, success_threshold = 0.05):
-
-    eval_data = defaultdict(list)
-    counter = 0
-    for freq in range(start_range, end_range, step):
-
-        eval_data["control_freq"].append(freq)
-        args.control_freq = freq
-        rollout_stats = run_trained_agent(args)
-        for stat in rollout_stats:
-            eval_data[stat].append(rollout_stats[stat])
-
-    df = pd.DataFrame(eval_data)
-
-    control_freq_eval_save_path = os.path.abspath(os.path.join(args.agent, '..', '..', 'logs/control_freq_eval.xlsx'))
-
-    df.to_excel(control_freq_eval_save_path)
 
 
 
@@ -732,17 +625,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/can_image_diffusion_policy/20240620123559/models/model_epoch_600.pth",
+        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/lift_image_diffusion_policy/20240609000333/models/model_epoch_600.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )
-
 
     # number of rollouts
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=50,
+        default=20,
         help="number of rollouts",
     )
 
@@ -778,21 +670,13 @@ if __name__ == "__main__":
         help="(optional) render rollouts to this video file path",
     )
 
-    parser.add_argument(
-        "--video_dir",
-        type=str,
-        default=None,
-        help = "(Optional) where to save videos of the different evals"
-    )
-
     # How often to write video frames during the rollout
     parser.add_argument(
         "--video_skip",
         type=int,
-        default=1,
+        default=5,
         help="render frames to video every n steps",
     )
-
 
     # camera names to render
     parser.add_argument(
@@ -846,16 +730,10 @@ if __name__ == "__main__":
         help="Where to save the rollout stats to, as a pandas dataframe"
     )
 
+
     args = parser.parse_args()
+    # args.evaluate_control_freqs = True
+    # args.render = True
 
-    if args.video_dir is None:
-        args.video_dir = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'videos'))
-
-    if args.rollout_stats_path is None:
-        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'multi_eval.xlsx'))
-
-    # if args.evaluate_control_freqs:
-    #     evaluate_over_control_freqs(args)
-    # else:
-    evaluate_aggregated_actions(args)
+    run_trained_agent(args)
 
