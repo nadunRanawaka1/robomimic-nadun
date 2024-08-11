@@ -14,13 +14,13 @@ import robomimic.utils.env_utils as EnvUtils
 import robomimic.utils.obs_utils as ObsUtils
 import robomimic.utils.transform_utils as TransformUtils
 from robomimic.envs.env_base import EnvBase
+from robomimic.dev.dev_utils import aggregate_delta_actions
+
+
+
 import nexusformat.nexus as nx
 
-### Setup some constants
-DELTA_ACTION_MAGNITUDE_LIMIT = 1.0
-DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
-DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
-SCALE_ACTION_LIMIT = [0.05, 0.05, 0.05, 0.5, 0.5, 0.5]
+### END IMPORTS
 
 
 
@@ -35,81 +35,49 @@ normal_video_fn = "/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/n
 
 
 ### Read in demo file
-demo_file = h5py.File(demo_fn)
 
 
-### Init env
-env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
 
-### Resetting controller max control input and output here
-# env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
-# env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
-#
-# env_meta['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
-# env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
-env_meta['env_kwargs']['controller_configs']['control_delta'] = False
+def complete_setup_for_replay(demo_fn):
+    demo_file = h5py.File(demo_fn)
 
-env = EnvUtils.create_env_from_metadata(env_meta,
-                                        render=True,
-                                        use_image_obs=True)
+    ### Init env
+    env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
 
-### Initializing OBS specs
-demo = demo_file['data/demo_0']
+    ### Resetting controller max control input and output here
+    # env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
+    # env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
+    #
+    # env_meta['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
+    # env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
+    env_meta['env_kwargs']['controller_configs']['control_delta'] = False
 
-obs = demo['obs']
-obs_modality_spec = {"obs": {
-    "low_dim": [],
-    "rgb": []
+    env = EnvUtils.create_env_from_metadata(env_meta,
+                                            render=True,
+                                            use_image_obs=True)
+
+    ### Initializing OBS specs
+    demo = demo_file['data/demo_0']
+
+    obs = demo['obs']
+    obs_modality_spec = {"obs": {
+        "low_dim": [],
+        "rgb": []
     }
-}
-for obs_key in obs:
-    if "image" in obs_key:
-        obs_modality_spec["obs"]["rgb"].append(obs_key)
-    else:
-        obs_modality_spec["obs"]["low_dim"].append(obs_key)
-
-ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
-
-actions = demo["actions"][:]
-print()
-
-def aggregate_delta_actions(actions):
-
-    actions = np.array(actions)
-    agg_actions = []
-    curr_action = actions[0]
-
-
-    for i in range(1, actions.shape[0]):
-        if sum(np.abs(curr_action[0:3])) > DELTA_ACTION_MAGNITUDE_LIMIT:
-            agg_actions.append(curr_action)
-            curr_action = actions[i]
-            continue
-
-
-        ### check if current action and next action are in similar directions
-        next_action_delta_pos = actions[i][0:3] + DELTA_EPSILON
-        # First normalize both
-        next_action_norm = np.linalg.norm(next_action_delta_pos)
-        next_action_delta_pos /= next_action_norm
-        curr_action_delta_pos = np.copy(curr_action[0:3]) + DELTA_EPSILON
-        curr_action_norm = np.linalg.norm(curr_action_delta_pos)
-        curr_action_delta_pos /= curr_action_norm
-        # Then use dot product to check
-        d_prod = np.dot(next_action_delta_pos, curr_action_delta_pos)
-
-        if d_prod < DELTA_ACTION_DIRECTION_THRESHOLD: # curr action and next action are not in the same direction
-            agg_actions.append(curr_action)
-            curr_action = actions[i]
+    }
+    for obs_key in obs:
+        if "image" in obs_key:
+            obs_modality_spec["obs"]["rgb"].append(obs_key)
         else:
-            curr_action[0:6] += actions[i][0:6]
-            curr_action[-1] = actions[i][-1]
+            obs_modality_spec["obs"]["low_dim"].append(obs_key)
 
-    agg_actions.append(curr_action)
-    return agg_actions
+    ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
+    return env, demo_file
 
+def replay_by_aggregating(demo_fn, limit, video_fn=None):
 
-def replay_by_aggregating(demo_file, limit, video_fn=None):
+    env, demo_file = complete_setup_for_replay(demo_fn)
+
 
     print("Replaying by aggregating")
 
@@ -127,10 +95,9 @@ def replay_by_aggregating(demo_file, limit, video_fn=None):
             break
         counter += 1
 
-        # print(f"Replaying demo : {counter}")
+        print(f"Replaying demo : {counter}")
 
         demo = demo_file[f'data/{ep}']
-
 
         states = demo_file["data/{}/states".format(ep)][()]
         initial_state = dict(states=states[0])
@@ -174,8 +141,10 @@ def replay_by_aggregating(demo_file, limit, video_fn=None):
     print(f"Time taken aggregating: {time_taken}")
     print(f"Num agg actions: {num_agg_actions}")
 
-def replay_by_skipping(demo_file, limit, video_fn=None):
+def replay_by_skipping(demo_fn, limit, video_fn=None):
     ### Make fast video
+
+    env, demo_file = complete_setup_for_replay(demo_fn)
 
     if video_fn is not None:
         video_writer = imageio.get_writer(video_fn, fps=20)
@@ -253,9 +222,9 @@ def replay_by_skipping(demo_file, limit, video_fn=None):
     print(f"Num skipped actions:{num_skipped_actions}")
 
 
-def replay_normal_speed(demo_file, limit, video_fn=None):
+def replay_normal_speed(demo_fn, limit, video_fn=None):
 
-
+    env, demo_file = complete_setup_for_replay(demo_fn)
 
     if video_fn is not None:
         video_writer = imageio.get_writer(video_fn, fps=20)
@@ -271,8 +240,6 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
             break
         counter += 1
 
-        # print(f"processing demo of slow: {counter}")
-
         demo = demo_file[f'data/{ep}']
 
         states = demo_file["data/{}/states".format(ep)][()]
@@ -283,9 +250,6 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
         env.reset_to(initial_state)
 
         actions = demo['absolute_actions'][:]  # action is [dpos, drot, gripper] where dpos and drot are vectors of size 3
-
-        ee_pos = demo['obs/robot0_eef_pos'][:]
-        ee_quat = demo['obs/robot0_eef_quat'][:]
 
 
         start = time.time()
@@ -299,25 +263,11 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
 
         for i in range(n):
             act = actions[i]
-            pos = ee_pos[i]
-            quat = ee_quat[i]
-            # axis, angle = TransformUtils.quat2axisangle(quat)
-            # aa = TransformUtils.axisangle2vec(axis, angle)
-            # act[0:3] = pos
-            # act[3:6] = aa
-
-            #
-            # act = TransformUtils.absolute_action_to_delta(act, pos, quat)
-
-
-
             next_obs, _, _, _ = env.step(act)
-            # env.render()
+
             if video_fn is not None:
                 video_img = env.env.sim.render(height=512, width=512, camera_name="agentview")[::-1]
-                video_writer.append_data(video_img)
-
-            # time.sleep(0.05)
+                video_writer.append_data(video_img)\
 
         time_taken += time.time() - start
 
@@ -326,25 +276,23 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
     if video_fn is not None:
         video_writer.close()
     print(f"Normal reward: {normal_reward}")
-    print(f"Time take normal: {time_taken}")
+    print(f"Time taken normal: {time_taken}")
     print(f"Num normal actions: {num_actions}")
 
 
-def replay_joint_actions(demo_file, limit, video_fn):
-    demo_file = h5py.File(demo_fn)
+def replay_joint_position_actions(demo_fn, limit, video_fn):
+
+    env, demo_file = complete_setup_for_replay(demo_fn)
 
     ### Init env
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
     joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_position_nadun.json"
-    # joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
     controller_configs = json.load(open(joint_controller_fp))
     env_meta["env_kwargs"]["controller_configs"] = controller_configs
 
     env = EnvUtils.create_env_from_metadata(env_meta,
                                             render=True,
                                             use_image_obs=True)
-
-
 
     if video_fn is not None:
         video_writer = imageio.get_writer(video_fn, fps=20)
@@ -373,7 +321,7 @@ def replay_joint_actions(demo_file, limit, video_fn):
         env.reset_to(initial_state)
 
         actions = demo['obs/robot0_joint_pos'][:]  # action is [joint_pos, gripper] where dpos and drot are vectors of size 3
-        gripper_actions = demo['absolute_actions'][:,-1]
+        gripper_actions = demo['actions'][:,-1]
         gripper_actions = np.expand_dims(gripper_actions, axis=1)
 
         actions = np.concatenate([actions, gripper_actions], axis=1)
@@ -387,10 +335,6 @@ def replay_joint_actions(demo_file, limit, video_fn):
         n = actions.shape[0]
         num_actions += n
 
-        next_obs = None
-
-        prev_act = actions[0]
-
         joint_pos_list = []
         for i in range(n):
             act = np.copy(actions[i])
@@ -399,24 +343,19 @@ def replay_joint_actions(demo_file, limit, video_fn):
             joint_pos = next_obs["robot0_joint_pos"]
 
             joint_pos_list.append(joint_pos)
-            # print(f"Robot joint_pos : {joint_pos} . Previous action: {prev_act}")
 
             act[:-1] = act[:-1] - joint_pos
             act[:-1] *= 2
 
             next_obs, _, _, _ = env.step(act)
 
-            prev_act = act
-            # env.render()
             if video_fn is not None:
                 video_img = env.env.sim.render(height=512, width=512, camera_name="agentview")[::-1]
                 video_writer.append_data(video_img)
 
-            # time.sleep(0.05)
 
         time_taken += time.time() - start
 
-        joint_pos_list = np.array(joint_pos_list)
 
         normal_reward += env.get_reward()
 
@@ -435,7 +374,7 @@ if __name__ == "__main__":
     # replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_3_100.mp4")
     # replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
     # replay_normal_speed(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_10_absolute_actions_method_1.mp4")
-    replay_joint_actions(demo_file, 200, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_200.mp4")
+    replay_joint_position_actions(demo_fn, 200, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_200.mp4")
 
 
 

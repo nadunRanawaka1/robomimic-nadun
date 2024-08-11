@@ -70,47 +70,44 @@ import robomimic.utils.obs_utils as ObsUtils
 from robomimic.envs.env_base import EnvBase
 from robomimic.envs.wrappers import EnvWrapper
 from robomimic.algo import RolloutPolicy
+from robomimic.dev.dev_utils import aggregate_delta_actions
 from collections import defaultdict
 import pandas as pd
 
 ### Setup some constants
-DELTA_ACTION_MAGNITUDE_LIMIT = 1.0
-DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
-DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
-SCALE_ACTION_LIMIT = 0.05
 
-def aggregate_delta_actions(actions, kw_args):
-
-    actions = np.array(actions)
-    agg_actions = []
-    curr_action = actions[0]
-
-    for i in range(1, actions.shape[0]):
-        if sum(np.abs(curr_action[0:3])) > kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"]:
-            agg_actions.append(curr_action)
-            curr_action = actions[i]
-            continue
-
-        ### check if current action and next action are in similar directions
-        next_action_delta_pos = actions[i][0:3] + kw_args["DELTA_EPSILON"]
-        # First normalize both
-        next_action_norm = np.linalg.norm(next_action_delta_pos)
-        next_action_delta_pos /= next_action_norm
-        curr_action_delta_pos = np.copy(curr_action[0:3]) + kw_args["DELTA_EPSILON"]
-        curr_action_norm = np.linalg.norm(curr_action_delta_pos)
-        curr_action_delta_pos /= curr_action_norm
-        # Then use dot product to check
-        d_prod = np.dot(next_action_delta_pos, curr_action_delta_pos)
-
-        if d_prod < kw_args["DELTA_ACTION_DIRECTION_THRESHOLD"]: # curr action and next action are not in the same direction
-            agg_actions.append(curr_action)
-            curr_action = actions[i]
-        else:
-            curr_action[0:6] += actions[i][0:6]
-            curr_action[-1] = actions[i][-1]
-
-    agg_actions.append(curr_action)
-    return agg_actions
+# def aggregate_delta_actions(actions, kw_args):
+#
+#     actions = np.array(actions)
+#     agg_actions = []
+#     curr_action = actions[0]
+#
+#     for i in range(1, actions.shape[0]):
+#         if sum(np.abs(curr_action[0:3])) > kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"]:
+#             agg_actions.append(curr_action)
+#             curr_action = actions[i]
+#             continue
+#
+#         ### check if current action and next action are in similar directions
+#         next_action_delta_pos = actions[i][0:3] + kw_args["DELTA_EPSILON"]
+#         # First normalize both
+#         next_action_norm = np.linalg.norm(next_action_delta_pos)
+#         next_action_delta_pos /= next_action_norm
+#         curr_action_delta_pos = np.copy(curr_action[0:3]) + kw_args["DELTA_EPSILON"]
+#         curr_action_norm = np.linalg.norm(curr_action_delta_pos)
+#         curr_action_delta_pos /= curr_action_norm
+#         # Then use dot product to check
+#         d_prod = np.dot(next_action_delta_pos, curr_action_delta_pos)
+#
+#         if d_prod < kw_args["DELTA_ACTION_DIRECTION_THRESHOLD"]: # curr action and next action are not in the same direction
+#             agg_actions.append(curr_action)
+#             curr_action = actions[i]
+#         else:
+#             curr_action[0:6] += actions[i][0:6]
+#             curr_action[-1] = actions[i][-1]
+#
+#     agg_actions.append(curr_action)
+#     return agg_actions
 
 def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
     assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
@@ -155,7 +152,7 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
             total_inference_time += time.time() - start
 
             if kw_args["aggregate_actions"]:
-                agg_actions = aggregate_delta_actions(actions, kw_args)
+                agg_actions = aggregate_delta_actions(actions, kw_args=kw_args)
 
                 # play aggregate actions
                 for act in agg_actions:
@@ -534,10 +531,10 @@ def run_trained_agent(args, **kw_args):
 
 
     # TODO setting some scaling things here
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = - kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] =  [kw_args["SCALE_ACTION_LIMIT"] * -1 for i in range(3)] + [kw_args["SCALE_ACTION_LIMIT"] * -10 for i in range(3)]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = [kw_args["SCALE_ACTION_LIMIT"] * 1 for i in range(3)] + [kw_args["SCALE_ACTION_LIMIT"] * 10 for i in range(3)]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = - kw_args["delta_action_magnitude_limit"]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = kw_args["delta_action_magnitude_limit"]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] =  [kw_args["scale_action_limit"] * -1 for i in range(3)] + [kw_args["scale_action_limit"] * -10 for i in range(3)]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = [kw_args["scale_action_limit"] * 1 for i in range(3)] + [kw_args["scale_action_limit"] * 10 for i in range(3)]
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['kp'] = kw_args["kp"]
 
     # read rollout settings
@@ -639,15 +636,15 @@ def run_trained_agent(args, **kw_args):
 
 def evaluate_aggregated_actions(args):
     # TODO put these in config or pass in if necessary
-    DELTA_ACTION_MAGNITUDE_LIMITS = [1.0, 2.0, 3.0, 4.0]
-    DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
-    DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
-    SCALE_ACTION_LIMITS = [0.05, 0.10, 0.15, 0.20]
+    delta_action_magnitude_limits = [1.0, 2.0, 3.0, 4.0]
+    delta_epsilon = np.array([1e-7, 1e-7, 1e-7])
+    delta_action_direction_threshold = 0.25
+    scale_action_limits = [0.05, 0.10, 0.15, 0.20]
     kp_values = [100 + i*10 for i in range(21)]
 
-    kw_args = {"return_action_sequence": False, "aggregate_actions": False, "DELTA_ACTION_DIRECTION_THRESHOLD": 0.25,
-               "DELTA_EPSILON": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05,
-               "DELTA_ACTION_MAGNITUDE_LIMIT": 1.0, "kp": 150}
+    kw_args = {"return_action_sequence": False, "aggregate_actions": False, "delta_action_direction_threshold": 0.25,
+               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05,
+               "delta_action_magnitude_limit": 1.0, "kp": 150}
 
     # Test non-aggregated first
     # args.video_path = f"{args.video_dir}/non_aggregated_actions.mp4"
@@ -659,23 +656,23 @@ def evaluate_aggregated_actions(args):
     df = pd.DataFrame(rollout_stats)
 
     # Now test the aggregated actions
-    kw_args = {"return_action_sequence": True, "aggregate_actions": True, "DELTA_ACTION_DIRECTION_THRESHOLD": 0.25,
-               "DELTA_EPSILON": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05,
-               "DELTA_ACTION_MAGNITUDE_LIMIT": 1.0, "kp": 150}
+    kw_args = {"return_action_sequence": True, "aggregate_actions": True, "delta_action_direction_threshold": 0.25,
+               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05,
+               "delta_action_magnitude_limit": 1.0, "kp": 150}
 
-    for idx, limit in enumerate(SCALE_ACTION_LIMITS):
+    for idx, limit in enumerate(scale_action_limits):
 
-        kw_args["SCALE_ACTION_LIMIT"] = limit
-        kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"] = DELTA_ACTION_MAGNITUDE_LIMITS[idx]
+        kw_args["scale_action_limits"] = limit
+        kw_args["delta_action_magnitude_limit"] = delta_action_magnitude_limits[idx]
 
         if args.video_dir is not None:
-            args.video_path = f"{args.video_dir}/action_magnitude_{DELTA_ACTION_MAGNITUDE_LIMITS[idx]}_scale_fix.mp4"
+            args.video_path = f"{args.video_dir}/action_magnitude_{delta_action_magnitude_limits[idx]}_scale_fix.mp4"
 
         # for kp in kp_values:
         #     kw_args["kp"] = kp
 
         avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
-        rollout_stats["action_magnitude_limit"] = [DELTA_ACTION_MAGNITUDE_LIMITS[idx] for i in range(args.n_rollouts)]
+        rollout_stats["action_magnitude_limit"] = [delta_action_magnitude_limits[idx] for i in range(args.n_rollouts)]
         # rollout_stats["kp"] = [kp for i in range(args.n_rollouts)]
 
         if df is None:
