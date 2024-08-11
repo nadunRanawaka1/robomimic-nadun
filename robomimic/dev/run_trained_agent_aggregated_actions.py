@@ -76,40 +76,6 @@ import pandas as pd
 
 ### Setup some constants
 
-# def aggregate_delta_actions(actions, kw_args):
-#
-#     actions = np.array(actions)
-#     agg_actions = []
-#     curr_action = actions[0]
-#
-#     for i in range(1, actions.shape[0]):
-#         if sum(np.abs(curr_action[0:3])) > kw_args["DELTA_ACTION_MAGNITUDE_LIMIT"]:
-#             agg_actions.append(curr_action)
-#             curr_action = actions[i]
-#             continue
-#
-#         ### check if current action and next action are in similar directions
-#         next_action_delta_pos = actions[i][0:3] + kw_args["DELTA_EPSILON"]
-#         # First normalize both
-#         next_action_norm = np.linalg.norm(next_action_delta_pos)
-#         next_action_delta_pos /= next_action_norm
-#         curr_action_delta_pos = np.copy(curr_action[0:3]) + kw_args["DELTA_EPSILON"]
-#         curr_action_norm = np.linalg.norm(curr_action_delta_pos)
-#         curr_action_delta_pos /= curr_action_norm
-#         # Then use dot product to check
-#         d_prod = np.dot(next_action_delta_pos, curr_action_delta_pos)
-#
-#         if d_prod < kw_args["DELTA_ACTION_DIRECTION_THRESHOLD"]: # curr action and next action are not in the same direction
-#             agg_actions.append(curr_action)
-#             curr_action = actions[i]
-#         else:
-#             curr_action[0:6] += actions[i][0:6]
-#             curr_action[-1] = actions[i][-1]
-#
-#     agg_actions.append(curr_action)
-#     return agg_actions
-
-    # return np.all(gripper_act ==
 
 def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
     assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
@@ -499,7 +465,6 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
             # update for next iter
             obs = deepcopy(next_obs)
             state_dict = env.get_state()
-
 
     except env.rollout_exceptions as e:
         print("WARNING: got rollout exception {}".format(e))
