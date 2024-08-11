@@ -718,9 +718,7 @@ def evaluate_over_control_freqs(args, start_range=10, end_range=200, step=2, suc
             eval_data[stat].append(rollout_stats[stat])
 
     df = pd.DataFrame(eval_data)
-
     control_freq_eval_save_path = os.path.abspath(os.path.join(args.agent, '..', '..', 'logs/control_freq_eval.xlsx'))
-
     df.to_excel(control_freq_eval_save_path)
 
 

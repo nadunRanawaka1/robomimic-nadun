@@ -2,13 +2,12 @@ import numpy as np
 
 ### Setup some constants
 # TODO: find best way to handle these constants
-DELTA_ACTION_MAGNITUDE_LIMIT = 1.0
+DELTA_ACTION_MAGNITUDE_LIMIT = 3.0
 DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
 DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
 SCALE_ACTION_LIMIT = [0.05, 0.05, 0.05, 0.5, 0.5, 0.5]
 
-
-
+GRIPPER_CHANGE_THRESHOLD = 0.3
 
 def demo_obs_to_obs_dict(demo_obs, ind):
     obs_dict = {}
@@ -16,7 +15,7 @@ def demo_obs_to_obs_dict(demo_obs, ind):
         obs_dict[o] = demo_obs[o][ind]
     return obs_dict
 
-def in_same_direction(act1, act2, threshold):
+def in_same_direction(act1, act2, threshold=DELTA_ACTION_DIRECTION_THRESHOLD):
     """
     Check if two actions are in the same direction
     """
@@ -73,3 +72,35 @@ def aggregate_delta_actions(actions, obs=None, **kwargs):
 
     agg_actions.append(curr_action)
     return agg_actions
+
+
+def aggregate_delta_actions_with_gripper_check(actions, gripper_obs):
+    actions = np.array(actions)
+    agg_actions = []
+    curr_action = actions[0]
+
+
+    for i in range(1, actions.shape[0]):
+        if sum(np.abs(curr_action[0:3])) > DELTA_ACTION_MAGNITUDE_LIMIT:
+            agg_actions.append(curr_action)
+            curr_action = actions[i]
+            continue
+
+        curr_gripper_obs = gripper_obs[i]
+        prev_gripper_obs = gripper_obs[i-1]
+
+        gripper_same = True
+        if np.sum(np.abs(curr_gripper_obs - prev_gripper_obs)) > GRIPPER_CHANGE_THRESHOLD:
+            gripper_same = False
+
+        if in_same_direction(actions[i], curr_action) and gripper_same:
+            # If actions are in the same direction and the gripper action does not change, aggregate
+            curr_action[0:6] += actions[i][0:6]
+            curr_action[-1] = actions[i][-1]
+        else:
+            # Either not in same direction or gripper action changes
+            agg_actions.append(curr_action)
+            curr_action = actions[i]
+
+    ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
+    return env, demo_file
