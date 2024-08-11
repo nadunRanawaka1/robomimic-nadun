@@ -6,10 +6,6 @@ from robomimic.dev.dev_utils import DELTA_ACTION_MAGNITUDE_LIMIT, GRIPPER_CHANGE
 import nexusformat.nexus as nx
 
 
-
-
-
-
 def aggregate_delta_actions_with_gripper_check(actions, obs):
 
     agg_actions = []
@@ -61,7 +57,6 @@ for ep in demo_file["data"]:
     print(f"processing demo {ep}")
 
     agg_actions = aggregate_delta_actions_with_gripper_check(delta_actions, obs)
-
 
     # Write the dataset with new actins
     out_file_ep_grp = out_file_data[f'{ep}']

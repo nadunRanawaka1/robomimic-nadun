@@ -380,8 +380,6 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
 if __name__ == "__main__":
 
     ### execute functions
-     replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
-    # replay_normal_speed(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_10_absolute_actions_method_1.mp4")
     replay_joint_position_actions(demo_fn, 200, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_200.mp4")
 
 
