@@ -17,15 +17,20 @@ from robomimic.envs.env_base import EnvBase
 import nexusformat.nexus as nx
 
 ### Setup some constants
-DELTA_ACTION_MAGNITUDE_LIMIT = 1.0
+DELTA_ACTION_MAGNITUDE_LIMIT = 3.0
 DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
 DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
-SCALE_ACTION_LIMIT = [0.05, 0.05, 0.05, 0.5, 0.5, 0.5]
+# SCALE_ACTION_LIMIT_MIN = [-0.05, -0.05, -0.05, -0.5, -0.5, -0.5]
+# SCALE_ACTION_LIMIT_MAX = [0.05, 0.05, 0.05, 0.5, 0.5, 0.5]
+
+SCALE_ACTION_LIMIT = 0.5
+
+GRIPPER_CHANGE_THRESHOLD = 0.3
 
 
 
-demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141_copy.hdf5"
-
+demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141.hdf5"
+#
 # demo = nx.nxload(demo_fn)
 # print(demo.tree)
 
@@ -42,12 +47,21 @@ demo_file = h5py.File(demo_fn)
 env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
 
 ### Resetting controller max control input and output here
-# env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
-# env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
-#
-# env_meta['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
-# env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
-env_meta['env_kwargs']['controller_configs']['control_delta'] = False
+env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
+env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
+
+# env_meta['env_kwargs']['controller_configs']['output_min'] = SCALE_ACTION_LIMIT_MIN
+# env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT_MAX
+
+env_meta['env_kwargs']['controller_configs']['output_min'] = [SCALE_ACTION_LIMIT * -1 for i
+                                                                               in range(3)] + [
+                                                                                  SCALE_ACTION_LIMIT * -10
+                                                                                  for i in range(3)]
+env_meta['env_kwargs']['controller_configs']['output_max'] = [SCALE_ACTION_LIMIT * 1 for i
+                                                                               in range(3)] + [
+                                                                                  SCALE_ACTION_LIMIT * 10 for
+                                                                                  i in range(3)]
+# env_meta['env_kwargs']['controller_configs']['control_delta'] = False
 
 env = EnvUtils.create_env_from_metadata(env_meta,
                                         render=True,
@@ -73,8 +87,76 @@ ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
 actions = demo["actions"][:]
 print()
 
-def aggregate_delta_actions(actions):
 
+def in_same_direction(act1, act2):
+    act1_delta_pos = act1[0:3] + DELTA_EPSILON
+    # First normalize both
+    act1_norm = np.linalg.norm(act1_delta_pos)
+    act1_delta_pos /= act1_norm
+
+    act2_delta_pos = act2[0:3] + DELTA_EPSILON
+    act2_norm = np.linalg.norm(act2_delta_pos)
+    act2_delta_pos /= act2_norm
+
+    # Then use dot product to check
+    d_prod = np.dot(act1_delta_pos, act2_delta_pos)
+
+    if d_prod < DELTA_ACTION_DIRECTION_THRESHOLD:
+        return False
+    else:
+        return True
+
+
+def aggregate_delta_actions(actions, gripper_obs=None):
+
+    actions = np.array(actions)
+    agg_actions = []
+    curr_action = actions[0]
+
+
+    for i in range(1, actions.shape[0]):
+
+        # If magnitude of current aggregated action greater than limit, add to list and start new aggregation
+        if sum(np.abs(curr_action[0:3])) > DELTA_ACTION_MAGNITUDE_LIMIT:
+            agg_actions.append(curr_action)
+            curr_action = actions[i]
+            continue
+
+        if in_same_direction(actions[i], curr_action):
+            # If actions are in the same direction, aggregate
+            curr_action[0:6] += actions[i][0:6]
+            curr_action[-1] = actions[i][-1]
+        else:
+            # Add current aggregated action to list and start new aggregation
+            agg_actions.append(curr_action)
+            curr_action = actions[i]
+
+
+        ### check if current action and next action are in similar directions
+        # next_action_delta_pos = actions[i][0:3] + DELTA_EPSILON
+        # # First normalize both
+        # next_action_norm = np.linalg.norm(next_action_delta_pos)
+        # next_action_delta_pos /= next_action_norm
+        # curr_action_delta_pos = np.copy(curr_action[0:3]) + DELTA_EPSILON
+        # curr_action_norm = np.linalg.norm(curr_action_delta_pos)
+        # curr_action_delta_pos /= curr_action_norm
+        # # Then use dot product to check
+        # d_prod = np.dot(next_action_delta_pos, curr_action_delta_pos)
+        #
+        # if d_prod < DELTA_ACTION_DIRECTION_THRESHOLD: # curr action and next action are not in the same direction
+        #     agg_actions.append(curr_action)
+        #     curr_action = actions[i]
+        # else:
+        #     curr_action[0:6] += actions[i][0:6]
+        #     curr_action[-1] = actions[i][-1]
+
+
+
+    agg_actions.append(curr_action)
+    return agg_actions
+
+
+def aggregate_delta_actions_with_gripper_check(actions, gripper_obs):
     actions = np.array(actions)
     agg_actions = []
     curr_action = actions[0]
@@ -86,32 +168,47 @@ def aggregate_delta_actions(actions):
             curr_action = actions[i]
             continue
 
+        curr_gripper_obs = gripper_obs[i]
+        prev_gripper_obs = gripper_obs[i-1]
 
-        ### check if current action and next action are in similar directions
-        next_action_delta_pos = actions[i][0:3] + DELTA_EPSILON
-        # First normalize both
-        next_action_norm = np.linalg.norm(next_action_delta_pos)
-        next_action_delta_pos /= next_action_norm
-        curr_action_delta_pos = np.copy(curr_action[0:3]) + DELTA_EPSILON
-        curr_action_norm = np.linalg.norm(curr_action_delta_pos)
-        curr_action_delta_pos /= curr_action_norm
-        # Then use dot product to check
-        d_prod = np.dot(next_action_delta_pos, curr_action_delta_pos)
+        gripper_same = True
+        if np.sum(np.abs(curr_gripper_obs - prev_gripper_obs)) > GRIPPER_CHANGE_THRESHOLD:
+            gripper_same = False
 
-        if d_prod < DELTA_ACTION_DIRECTION_THRESHOLD: # curr action and next action are not in the same direction
-            agg_actions.append(curr_action)
-            curr_action = actions[i]
-        else:
+        if in_same_direction(actions[i], curr_action) and gripper_same:
+            # If actions are in the same direction and the gripper action does not change, aggregate
             curr_action[0:6] += actions[i][0:6]
             curr_action[-1] = actions[i][-1]
+        else:
+            # Either not in same direction or gripper action changes
+            agg_actions.append(curr_action)
+            curr_action = actions[i]
+
+        # ### check if current action and next action are in similar directions
+        # next_action_delta_pos = actions[i][0:3] + DELTA_EPSILON
+        # # First normalize both
+        # next_action_norm = np.linalg.norm(next_action_delta_pos)
+        # next_action_delta_pos /= next_action_norm
+        # curr_action_delta_pos = np.copy(curr_action[0:3]) + DELTA_EPSILON
+        # curr_action_norm = np.linalg.norm(curr_action_delta_pos)
+        # curr_action_delta_pos /= curr_action_norm
+        # # Then use dot product to check
+        # d_prod = np.dot(next_action_delta_pos, curr_action_delta_pos)
+        #
+        # if d_prod < DELTA_ACTION_DIRECTION_THRESHOLD:  # curr action and next action are not in the same direction
+        #     agg_actions.append(curr_action)
+        #     curr_action = actions[i]
+        # else:
+        #     curr_action[0:6] += actions[i][0:6]
+        #     curr_action[-1] = actions[i][-1]
 
     agg_actions.append(curr_action)
     return agg_actions
 
 
-def replay_by_aggregating(demo_file, limit, video_fn=None):
 
-    print("Replaying by aggregating")
+def replay_by_aggregating(demo_file, limit, aggregating_function=aggregate_delta_actions, video_fn=None):
+
 
     if video_fn is not None:
         video_writer = imageio.get_writer(video_fn, fps=20)
@@ -123,14 +220,17 @@ def replay_by_aggregating(demo_file, limit, video_fn=None):
 
     for ep in demo_file["data"]:
 
+        counter += 1
         if counter > limit:
             break
-        counter += 1
 
-        # print(f"Replaying demo : {counter}")
+        if counter % 20 == 0 :
+            print(f"Replaying demo : {counter}")
 
         demo = demo_file[f'data/{ep}']
+        delta_actions = demo["actions"][:]
 
+        gripper_obs = demo['obs/robot0_gripper_qpos'][:]*100
 
         states = demo_file["data/{}/states".format(ep)][()]
         initial_state = dict(states=states[0])
@@ -139,7 +239,8 @@ def replay_by_aggregating(demo_file, limit, video_fn=None):
         env.reset()
         env.reset_to(initial_state)
 
-        agg_actions = aggregate_delta_actions(demo["actions"][:])  # action is [dpos, drot, gripper] where dpos and drot are vectors of size 3
+        agg_actions = aggregating_function(demo["actions"][:], gripper_obs)  # action is [dpos, drot, gripper] where dpos and drot are vectors of size 3
+
         num_agg_actions += len(agg_actions)
 
         start = time.time()
@@ -187,9 +288,10 @@ def replay_by_skipping(demo_file, limit, video_fn=None):
 
     for ep in demo_file["data"]:
 
+        counter += 1
+
         if counter > limit:
             break
-        counter += 1
 
         # print(f"processing demo of fast: {counter}")
 
@@ -255,8 +357,7 @@ def replay_by_skipping(demo_file, limit, video_fn=None):
 
 def replay_normal_speed(demo_file, limit, video_fn=None):
 
-
-
+    print("replaying normal")
     if video_fn is not None:
         video_writer = imageio.get_writer(video_fn, fps=20)
 
@@ -266,10 +367,13 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
     num_actions = 0
 
     for ep in demo_file["data"]:
-
+        counter += 1
         if counter > limit:
             break
-        counter += 1
+
+        if counter % 20 == 0 :
+            print(f"Replaying demo : {counter}")
+
 
         # print(f"processing demo of slow: {counter}")
 
@@ -282,10 +386,7 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
         env.reset()
         env.reset_to(initial_state)
 
-        actions = demo['absolute_actions'][:]  # action is [dpos, drot, gripper] where dpos and drot are vectors of size 3
-
-        ee_pos = demo['obs/robot0_eef_pos'][:]
-        ee_quat = demo['obs/robot0_eef_quat'][:]
+        actions = demo['actions'][:]  # action is [dpos, drot, gripper] where dpos and drot are vectors of size 3
 
 
         start = time.time()
@@ -299,17 +400,6 @@ def replay_normal_speed(demo_file, limit, video_fn=None):
 
         for i in range(n):
             act = actions[i]
-            pos = ee_pos[i]
-            quat = ee_quat[i]
-            # axis, angle = TransformUtils.quat2axisangle(quat)
-            # aa = TransformUtils.axisangle2vec(axis, angle)
-            # act[0:3] = pos
-            # act[3:6] = aa
-
-            #
-            # act = TransformUtils.absolute_action_to_delta(act, pos, quat)
-
-
 
             next_obs, _, _, _ = env.step(act)
             # env.render()
@@ -336,7 +426,7 @@ def replay_joint_actions(demo_file, limit, video_fn):
     ### Init env
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
     joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_position_nadun.json"
-    # joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
+    joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
     controller_configs = json.load(open(joint_controller_fp))
     env_meta["env_kwargs"]["controller_configs"] = controller_configs
 
@@ -355,11 +445,9 @@ def replay_joint_actions(demo_file, limit, video_fn):
     num_actions = 0
 
     for ep in demo_file["data"]:
-
+        counter += 1
         if counter > limit:
             break
-        counter += 1
-
 
         print(f"processing demo: {counter}")
 
@@ -373,7 +461,8 @@ def replay_joint_actions(demo_file, limit, video_fn):
         env.reset_to(initial_state)
 
         actions = demo['obs/robot0_joint_pos'][:]  # action is [joint_pos, gripper] where dpos and drot are vectors of size 3
-        gripper_actions = demo['absolute_actions'][:,-1]
+        actions = demo['obs/robot0_joint_vel'][:]
+        gripper_actions = demo['actions'][:,-1]
         gripper_actions = np.expand_dims(gripper_actions, axis=1)
 
         actions = np.concatenate([actions, gripper_actions], axis=1)
@@ -394,15 +483,6 @@ def replay_joint_actions(demo_file, limit, video_fn):
         joint_pos_list = []
         for i in range(n):
             act = np.copy(actions[i])
-
-            next_obs = env.get_observation()
-            joint_pos = next_obs["robot0_joint_pos"]
-
-            joint_pos_list.append(joint_pos)
-            # print(f"Robot joint_pos : {joint_pos} . Previous action: {prev_act}")
-
-            act[:-1] = act[:-1] - joint_pos
-            act[:-1] *= 2
 
             next_obs, _, _, _ = env.step(act)
 
@@ -432,10 +512,14 @@ def replay_joint_actions(demo_file, limit, video_fn):
 if __name__ == "__main__":
 
     ### execute functions
-    # replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_3_100.mp4")
+    print("Replaying by aggregating without gripper check")
+    replay_by_aggregating(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_100.mp4")
+    print("Replaying by aggregating with gripper check")
+    replay_by_aggregating(demo_file, 100, aggregating_function=aggregate_delta_actions_with_gripper_check,
+                          video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_with_gripper_check_100.mp4")
     # replay_by_skipping(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/skipping_actions_3_100.mp4")
-    # replay_normal_speed(demo_file, 10, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_10_absolute_actions_method_1.mp4")
-    replay_joint_actions(demo_file, 200, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_200.mp4")
+    # replay_normal_speed(demo_file, 100, video_fn="/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/normal_100_delta_actions.mp4")
+    # replay_joint_actions(demo_file, 20, video_fn="/media/nadun/Data/phd_project/robomimic/videos/square_playback/joint_velocity_actions_20.mp4")
 
 
 
