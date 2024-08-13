@@ -1,7 +1,7 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "lift_image_diffusion_policy",
+        "name": "lift_image_diffusion_policy_agg_actions_test",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -12,22 +12,23 @@
         "save": {
             "enabled": true,
             "every_n_seconds": null,
-            "every_n_epochs": 50,
+            "every_n_epochs": 100,
             "epochs": [],
             "on_best_validation": false,
             "on_best_rollout_return": false,
             "on_best_rollout_success_rate": true
         },
-        "epoch_every_n_steps": 500,
+        "epoch_every_n_steps": 30,
         "validation_epoch_every_n_steps": 10,
         "env": null,
+        "env_delta_magnitude_limit": 1.0,
         "additional_envs": null,
         "render": false,
         "render_video": true,
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
-            "enabled": false,
+            "enabled": true,
             "n": 50,
             "horizon": 400,
             "rate": 50,
@@ -49,8 +50,33 @@
         "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
-            "actions"
+            "agg_actions_magnitude_1"
         ],
+        "action_keys": [
+            "agg_actions_magnitude_1"
+        ],
+        "action_config": {
+            "actions": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            },
+            "agg_actions_magnitude_1": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            },
+            "agg_actions_magnitude_2": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            },
+            "agg_actions_magnitude_3": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            },
+            "agg_actions_magnitude_4": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            }
+        },
         "goal_mode": null,
         "cuda": true,
         "batch_size": 128,

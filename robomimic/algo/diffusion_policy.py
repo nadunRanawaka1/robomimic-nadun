@@ -301,7 +301,7 @@ class DiffusionPolicyUNet(PolicyAlgo):
             # put actions into the queue
             self.action_queue.extend(action_sequence[0])
 
-        if kwargs["return_action_sequence"]:
+        if kwargs.get("return_action_sequence", False):
             Ta = self.algo_config.horizon.action_horizon
             self.action_queue = deque(maxlen=Ta)
             return action_sequence

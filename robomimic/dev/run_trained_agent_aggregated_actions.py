@@ -708,7 +708,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=100,
+        default=5,
         help="number of rollouts",
     )
 
@@ -716,7 +716,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--horizon",
         type=int,
-        default=None,
+        default=200,
         help="(optional) override maximum horizon of rollout from the one in the checkpoint",
     )
 

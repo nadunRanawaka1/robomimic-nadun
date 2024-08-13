@@ -53,8 +53,8 @@ def aggregate_delta_actions(actions, obs=None, **kw_args):
     agg_actions = []
     curr_action = actions[0]
 
-    delta_action_magnitude_limit = kwargs.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
-    delta_action_direction_threshold = kwargs.get('delta_action_direction_threshold', DELTA_ACTION_DIRECTION_THRESHOLD)
+    delta_action_magnitude_limit = kw_args.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
+    delta_action_direction_threshold = kw_args.get('delta_action_direction_threshold', DELTA_ACTION_DIRECTION_THRESHOLD)
 
     for i in range(1, actions.shape[0]):
         if sum(np.abs(curr_action[0:3])) > delta_action_magnitude_limit:
@@ -165,7 +165,7 @@ def create_aggregated_delta_actions_with_gripper_check(actions, obs, **kw_args):
     agg_actions = []
     gripper_vel = obs['robot0_gripper_qvel'][:]*100
 
-    delta_action_magnitude_limit = kwargs.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
+    delta_action_magnitude_limit = kw_args.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
 
     for i in range(0, actions.shape[0]):
         curr_action = deepcopy(actions[i])

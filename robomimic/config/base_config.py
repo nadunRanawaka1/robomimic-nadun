@@ -106,6 +106,9 @@ class BaseConfig(Config):
         self.experiment.env = None                                  # no need to set this (unless you want to override)
         self.experiment.additional_envs = None                      # additional environments that should get evaluated
 
+        # TODO: new experiment env configs for speedup project
+        self.experiment.env_delta_magnitude_limit = 1.0
+
 
         ## rendering config ##
         self.experiment.render = False                              # render on-screen or not
@@ -121,6 +124,8 @@ class BaseConfig(Config):
         self.experiment.rollout.rate = 50                           # do rollouts every @rate epochs
         self.experiment.rollout.warmstart = 0                       # number of epochs to wait before starting rollouts
         self.experiment.rollout.terminate_on_success = True         # end rollout early after task success
+
+
 
         # for updating the evaluation env meta data
         self.experiment.env_meta_update_dict = Config()

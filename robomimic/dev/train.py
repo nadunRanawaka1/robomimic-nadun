@@ -112,7 +112,15 @@ def train(config, device, auto_remove_exp=False):
                 env_names.append(name)
 
         for env_name in env_names:
+            # TODO: setting specific stuff for the speedup project
+            delta_act_magnitude_limit = config.experiment.env_delta_magnitude_limit
+            env_meta['env_kwargs']['controller_configs']['input_min'] = -delta_act_magnitude_limit
+            env_meta['env_kwargs']['controller_configs']['input_max'] = delta_act_magnitude_limit
 
+            scale_action_min = [-0.05 * delta_act_magnitude_limit for i in range(3)] + [0.5 * delta_act_magnitude_limit for i in range(3)]
+            env_meta['env_kwargs']['controller_configs']['output_min'] = scale_action_min
+            scale_action_max = [0.05 * delta_act_magnitude_limit for i in range(3)] + [0.5 * delta_act_magnitude_limit for i in range(3)]
+            env_meta['env_kwargs']['controller_configs']['output_max'] = scale_action_max
 
             env = EnvUtils.create_env_from_metadata(
                 env_meta=env_meta,
@@ -125,6 +133,12 @@ def train(config, device, auto_remove_exp=False):
             env = EnvUtils.wrap_env_from_config(env, config=config) # apply environment warpper, if applicable
             envs[env.name] = env
             print(envs[env.name])
+
+            print("Created Environment")
+            print("========================================================================================")
+            print(env)
+            print("========================================================================================")
+
 
     print("")
 
