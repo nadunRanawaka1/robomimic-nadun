@@ -70,7 +70,7 @@ import robomimic.utils.obs_utils as ObsUtils
 from robomimic.envs.env_base import EnvBase
 from robomimic.envs.wrappers import EnvWrapper
 from robomimic.algo import RolloutPolicy
-from robomimic.dev.dev_utils import aggregate_delta_actions
+from robomimic.dev.dev_utils import aggregate_delta_actions, gripper_command_changed
 from collections import defaultdict
 import pandas as pd
 
@@ -242,7 +242,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                         if slowdown_mode:
                             agg_actions = act
                             slowdown_mode = False
-                        if gripper_changed(act[:, -1], last_gripper_act):
+                        if gripper_command_changed(act[:, -1], last_gripper_act):
                             agg_actions = act
                             slowdown_mode = True
                         else:
@@ -622,38 +622,45 @@ def evaluate_aggregated_actions(args):
     delta_epsilon = np.array([1e-7, 1e-7, 1e-7])
     delta_action_direction_threshold = 0.25
     scale_action_limits = [0.05, 0.10, 0.15, 0.20]
+
+    # delta_action_magnitude_limits = [1.0]
+    # delta_epsilon = np.array([1e-7, 1e-7, 1e-7])
+    # delta_action_direction_threshold = 0.25
+    # scale_action_limits = [0.05]
+
+
     kp_values = [100 + i*10 for i in range(21)]
     df = None
 
     kw_args = {"return_action_sequence": False, "aggregate_actions": False, "delta_action_direction_threshold": 0.25,
-               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05,
+               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
                "delta_action_magnitude_limit": 1.0, "kp": 150}
 
-    ### Test non-aggregated first
+    ### TODO: TESTING NORMAL ROLLOUTS
     args.video_path = f"{args.video_dir}/normal_rollout.mp4"
     avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
-    # rollout_stats["action_magnitude_limit"] = [-1 for i in range(args.n_rollouts)]
-    #
-    # rollout_stats["kp"] = [150 for i in range(args.n_rollouts)]
-    #
-    #
+    rollout_stats["action_magnitude_limit"] = [-1 for i in range(args.n_rollouts)]
+    # #
+    # # rollout_stats["kp"] = [150 for i in range(args.n_rollouts)]
+    # #
+    # #
     df = pd.DataFrame(rollout_stats)
 
-    # Now test the aggregated actions
+    ### TODO: TESTING AGGREGATED ROLLOUTS
+
+    check_gripper = False
+
     kw_args = {"return_action_sequence": True, "aggregate_actions": True, "delta_action_direction_threshold": 0.25,
-               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "SCALE_ACTION_LIMIT": 0.05,
-               "delta_action_magnitude_limit": 1.0, "kp": 150}
+               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
+               "delta_action_magnitude_limit": 1.0, "kp": 150, "check_gripper": check_gripper}
 
     for idx, limit in enumerate(scale_action_limits):
 
-        kw_args["scale_action_limits"] = limit
+        kw_args["scale_action_limit"] = limit
         kw_args["delta_action_magnitude_limit"] = delta_action_magnitude_limits[idx]
 
         if args.video_dir is not None:
-            args.video_path = f"{args.video_dir}/action_magnitude_{delta_action_magnitude_limits[idx]}_scale_fix.mp4"
-
-        # for kp in kp_values:
-        #     kw_args["kp"] = kp
+            args.video_path = f"{args.video_dir}/action_magnitude_{delta_action_magnitude_limits[idx]}_gripper_check_{check_gripper}.mp4"
 
         avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
         rollout_stats["action_magnitude_limit"] = [delta_action_magnitude_limits[idx] for i in range(args.n_rollouts)]
@@ -695,7 +702,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/can_image_diffusion_policy/20240620123559/models/model_epoch_600.pth",
+        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/lift_image_diffusion_policy/20240609000333/models/model_epoch_600.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )
@@ -705,7 +712,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=50,
+        default=100,
         help="number of rollouts",
     )
 
@@ -815,7 +822,7 @@ if __name__ == "__main__":
         args.video_dir = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'videos'))
 
     if args.rollout_stats_path is None:
-        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'multi_eval.xlsx'))
+        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'aggregated_eval.xlsx'))
 
     # if args.evaluate_control_freqs:
     #     evaluate_over_control_freqs(args)

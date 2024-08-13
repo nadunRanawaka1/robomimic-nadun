@@ -8,6 +8,7 @@ DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
 SCALE_ACTION_LIMIT = [0.05, 0.05, 0.05, 0.5, 0.5, 0.5]
 
 GRIPPER_CHANGE_THRESHOLD = 0.3
+GRIPPER_COMMAND_CHANGE_THRESHOLD = 0.2
 
 def demo_obs_to_obs_dict(demo_obs, ind):
     obs_dict = {}
@@ -104,3 +105,25 @@ def aggregate_delta_actions_with_gripper_check(actions, gripper_obs):
 
     ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
     return env, demo_file
+
+def gripper_command_changed(gripper_traj, last_gripper_act):
+    """
+    Args:
+        gripper_traj: nd.Array of gripper actions (1, N)
+        last_gripper_act: single gripper action - float
+
+    Made with help from ChatGPT
+    """
+    # Compute the pairwise absolute differences between gripper commands in the trajectory
+    diff_matrix = np.abs(gripper_traj[:, np.newaxis] - gripper_traj)
+
+    # Extract the upper triangle of the difference matrix (excluding the diagonal)
+    upper_triangle_diff = np.triu(diff_matrix, k=1)
+
+    # Check if any difference exceeds the threshold
+    changed = np.any(upper_triangle_diff > GRIPPER_COMMAND_CHANGE_THRESHOLD)
+
+    if changed or np.abs((gripper_traj[0]) - last_gripper_act) > GRIPPER_COMMAND_CHANGE_THRESHOLD:
+        return True
+    else:
+        return False
