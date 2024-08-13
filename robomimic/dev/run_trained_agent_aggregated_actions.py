@@ -623,11 +623,6 @@ def evaluate_aggregated_actions(args):
     delta_action_direction_threshold = 0.25
     scale_action_limits = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
 
-    # delta_action_magnitude_limits = [1.0]
-    # delta_epsilon = np.array([1e-7, 1e-7, 1e-7])
-    # delta_action_direction_threshold = 0.25
-    # scale_action_limits = [0.05]
-
 
     kp_values = [100 + i*10 for i in range(21)]
     df = None
@@ -648,7 +643,7 @@ def evaluate_aggregated_actions(args):
 
     ### TODO: TESTING AGGREGATED ROLLOUTS
 
-    check_gripper = False
+    check_gripper = True
 
     kw_args = {"return_action_sequence": True, "aggregate_actions": True, "delta_action_direction_threshold": 0.25,
                "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
@@ -822,7 +817,7 @@ if __name__ == "__main__":
         args.video_dir = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'videos'))
 
     if args.rollout_stats_path is None:
-        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'aggregated_eval.xlsx'))
+        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'aggregated_eval_with_gripper_check.xlsx'))
 
     # if args.evaluate_control_freqs:
     #     evaluate_over_control_freqs(args)
