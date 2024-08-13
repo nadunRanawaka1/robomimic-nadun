@@ -28,8 +28,19 @@ def in_same_direction(act1, act2, threshold=DELTA_ACTION_DIRECTION_THRESHOLD):
     act2_norm = np.linalg.norm(act2_delta_pos)
     act2_delta_pos /= act2_norm
 
-    d_prod = np.dot(act1_delta_pos, act2_delta_pos)
-    if d_prod > threshold:
+    d_prod_1 = np.dot(act1_delta_pos, act2_delta_pos)
+
+    act1_delta_angle = act1[3:6] + DELTA_EPSILON
+    act1_norm = np.linalg.norm(act1_delta_angle)
+    act1_delta_angle /= act1_norm
+
+    act2_delta_angle = act2[3:6] + DELTA_EPSILON
+    act2_norm = np.linalg.norm(act2_delta_angle)
+    act2_delta_angle /= act2_norm
+
+    d_prod_2 = np.dot(act1_delta_angle, act2_delta_angle)
+
+    if d_prod_1 > threshold and d_prod_2 > threshold:
         return True
     else:
         return False
