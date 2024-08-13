@@ -618,10 +618,10 @@ def run_trained_agent(args, **kw_args):
 def evaluate_aggregated_actions(args):
     # TODO put these in config or pass in if necessary
 
-    delta_action_magnitude_limits = [1.0, 2.0, 3.0, 4.0]
+    delta_action_magnitude_limits = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     delta_epsilon = np.array([1e-7, 1e-7, 1e-7])
     delta_action_direction_threshold = 0.25
-    scale_action_limits = [0.05, 0.10, 0.15, 0.20]
+    scale_action_limits = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
 
     # delta_action_magnitude_limits = [1.0]
     # delta_epsilon = np.array([1e-7, 1e-7, 1e-7])
