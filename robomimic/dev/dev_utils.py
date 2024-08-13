@@ -1,14 +1,17 @@
 import numpy as np
-
+from copy import deepcopy
 ### Setup some constants
 # TODO: find best way to handle these constants
-DELTA_ACTION_MAGNITUDE_LIMIT = 3.0
+DELTA_ACTION_MAGNITUDE_LIMIT = 4.0
 DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
 DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
-SCALE_ACTION_LIMIT = [0.05, 0.05, 0.05, 0.5, 0.5, 0.5]
 
-GRIPPER_CHANGE_THRESHOLD = 0.3
+SCALE_ACTION_LIMIT = [0.05 * DELTA_ACTION_MAGNITUDE_LIMIT for i in range(3)] + [0.5 * DELTA_ACTION_MAGNITUDE_LIMIT for i in range(3)]
+
+GRIPPER_VELOCITY_THRESHOLD = 0.5
 GRIPPER_COMMAND_CHANGE_THRESHOLD = 0.2
+
+REPEAT_LAST_ACTION_TIMES = 10
 
 def demo_obs_to_obs_dict(demo_obs, ind):
     obs_dict = {}
@@ -45,7 +48,7 @@ def in_same_direction(act1, act2, threshold=DELTA_ACTION_DIRECTION_THRESHOLD):
     else:
         return False
 
-def aggregate_delta_actions(actions, obs=None, **kwargs):
+def aggregate_delta_actions(actions, obs=None, **kw_args):
     actions = np.array(actions)
     agg_actions = []
     curr_action = actions[0]
@@ -85,6 +88,24 @@ def aggregate_delta_actions(actions, obs=None, **kwargs):
     agg_actions.append(curr_action)
     return agg_actions
 
+def aggregate_delta_actions_naive(actions, obs=None):
+    actions = np.array(actions)
+    agg_actions = []
+    curr_action = actions[0]
+
+    delta_action_magnitude_limit = kwargs.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
+
+
+    for i in range(1, actions.shape[0]):
+        if sum(np.abs(curr_action[0:3])) > delta_action_magnitude_limit:
+            agg_actions.append(curr_action)
+            curr_action = actions[i]
+        else:
+            curr_action[0:6] += actions[i][0:6]
+            curr_action[-1] = actions[i][-1]
+    agg_actions.append(curr_action)
+    return agg_actions
+
 
 def aggregate_delta_actions_with_gripper_check(actions, gripper_obs):
     actions = np.array(actions)
@@ -114,8 +135,7 @@ def aggregate_delta_actions_with_gripper_check(actions, gripper_obs):
             agg_actions.append(curr_action)
             curr_action = actions[i]
 
-    ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
-    return env, demo_file
+    return agg_actions
 
 def gripper_command_changed(gripper_traj, last_gripper_act):
     """
@@ -138,3 +158,33 @@ def gripper_command_changed(gripper_traj, last_gripper_act):
         return True
     else:
         return False
+
+
+def create_aggregated_delta_actions_with_gripper_check(actions, obs, **kw_args):
+
+    agg_actions = []
+    gripper_vel = obs['robot0_gripper_qvel'][:]*100
+
+    delta_action_magnitude_limit = kwargs.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
+
+    for i in range(0, actions.shape[0]):
+        curr_action = deepcopy(actions[i])
+        for j in range(i + 1, actions.shape[0]):
+            if sum(np.abs(curr_action[0:3])) > delta_action_magnitude_limit:
+                # Magnitude is too large, stop aggregating
+                break
+
+            gripper_same = True
+            if max(np.abs(gripper_vel[j])) > GRIPPER_VELOCITY_THRESHOLD:
+                gripper_same = False
+
+            if in_same_direction(actions[j], curr_action) and gripper_same:
+                # If actions are in the same direction and the gripper action does not change, aggregate
+                curr_action[0:6] += deepcopy(actions[j][0:6])
+                curr_action[-1] = deepcopy(actions[j][-1])
+            else:
+                # Either not in same direction or gripper action changes, stop aggregating
+                break
+
+        agg_actions.append(curr_action)
+    return np.array(agg_actions)

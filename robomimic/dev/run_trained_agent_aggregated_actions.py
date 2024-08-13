@@ -120,7 +120,8 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
             total_inference_time += time.time() - start
 
             if kw_args["aggregate_actions"]:
-                agg_actions = aggregate_delta_actions(actions, kw_args=kw_args)
+
+                agg_actions = aggregate_delta_actions(actions, obs=None, **kw_args)
 
                 # play aggregate actions
                 for act in agg_actions:
@@ -246,9 +247,9 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                             agg_actions = act
                             slowdown_mode = True
                         else:
-                            agg_actions = aggregate_delta_actions(act, kw_args)
+                            agg_actions = aggregate_delta_actions(act, None, **kw_args)
                     else:
-                        agg_actions = aggregate_delta_actions(act, kw_args)
+                        agg_actions = aggregate_delta_actions(act, None, **kw_args)
                     last_gripper_act = agg_actions[-1][-1]
                     for act in agg_actions:
                         next_obs, r, done, _ = env.step(act)

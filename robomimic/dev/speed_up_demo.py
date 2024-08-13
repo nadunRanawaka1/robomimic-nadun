@@ -14,8 +14,8 @@ import robomimic.utils.env_utils as EnvUtils
 import robomimic.utils.obs_utils as ObsUtils
 import robomimic.utils.transform_utils as TransformUtils
 from robomimic.envs.env_base import EnvBase
-from robomimic.dev.dev_utils import aggregate_delta_actions, in_same_direction
-from robomimic.dev.dev_utils import DELTA_ACTION_MAGNITUDE_LIMIT, SCALE_ACTION_LIMIT
+from robomimic.dev.dev_utils import aggregate_delta_actions, in_same_direction, aggregate_delta_actions_with_gripper_check
+from robomimic.dev.dev_utils import DELTA_ACTION_MAGNITUDE_LIMIT, SCALE_ACTION_LIMIT, REPEAT_LAST_ACTION_TIMES
 
 
 
@@ -32,14 +32,10 @@ GRIPPER_CHANGE_THRESHOLD = 0.3
 
 
 
-demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141.hdf5"
+
 #
 # demo = nx.nxload(demo_fn)
 # print(demo.tree)
-
-### Set video file names
-fast_video_fn = "/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/sped_up_3.mp4"
-normal_video_fn = "/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/normal_3.mp4"
 
 
 ### Read in demo file
@@ -51,16 +47,19 @@ def complete_setup_for_replay(demo_fn):
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
 
     ### Resetting controller max control input and output here
-    # env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
-    # env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
-    #
-    # env_meta['env_kwargs']['controller_configs']['output_min'] = -SCALE_ACTION_LIMIT
-    # env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
-    env_meta['env_kwargs']['controller_configs']['control_delta'] = False
+    env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
+    env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
+
+    env_meta['env_kwargs']['controller_configs']['output_min'] = [-x for x in SCALE_ACTION_LIMIT]
+    env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
+    # env_meta['env_kwargs']['controller_configs']['control_delta'] = True
 
     env = EnvUtils.create_env_from_metadata(env_meta,
                                             render=True,
                                             use_image_obs=True)
+
+    print("CREATED ENVIRONMENT =================================================")
+    print(env)
 
     ### Initializing OBS specs
     demo = demo_file['data/demo_0']
@@ -76,6 +75,9 @@ def complete_setup_for_replay(demo_fn):
             obs_modality_spec["obs"]["rgb"].append(obs_key)
         else:
             obs_modality_spec["obs"]["low_dim"].append(obs_key)
+
+    ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
+    return env, demo_file
 
 
 def replay_by_aggregating(demo_fn, limit, aggregating_function=aggregate_delta_actions, video_fn=None):
@@ -129,12 +131,20 @@ def replay_by_aggregating(demo_fn, limit, aggregating_function=aggregate_delta_a
             # env.render()
             # time.sleep(0.05)
 
+        # REPEATING THE LAST ACTION TO DROP ANY OBJECTS IF NEEDED
+        act = [0, 0, 0, 0, 0, 0, act[-1]]
+        for i in range(REPEAT_LAST_ACTION_TIMES):
+            next_obs, _, _, _ = env.step(act)
+            if video_fn is not None:
+                video_img = env.env.sim.render(height=512, width=512, camera_name="agentview")[::-1]
+                video_writer.append_data(video_img)
+
         time_taken += time.time() - start
         reward += env.get_reward()
 
         num_normal_actions = demo["actions"].shape[0]
         ### We do this to synchronize the normal video and aggregated one
-        for j in range(num_normal_actions - len(agg_actions)):
+        for j in range(num_normal_actions - (len(agg_actions) + REPEAT_LAST_ACTION_TIMES)):
             if video_fn is not None:
                 video_img = env.env.sim.render(height=512, width=512, camera_name="agentview")[::-1]
                 video_writer.append_data(video_img)
@@ -378,10 +388,10 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
 
 
 if __name__ == "__main__":
-
+    demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
     ### execute functions
-    replay_joint_position_actions(demo_fn, 200, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_200.mp4")
-
+    # replay_joint_position_actions(demo_fn, 200, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_200.mp4")
+    replay_by_aggregating(demo_fn, 100, aggregating_function=aggregate_delta_actions, video_fn="/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/aggregated_actions_4.mp4")
 
 
 
