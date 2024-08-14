@@ -1,7 +1,7 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "lift_image_diffusion_policy_agg_actions_test",
+        "name": "can_image_diffusion_policy_agg_actions_3",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -18,10 +18,10 @@
             "on_best_rollout_return": false,
             "on_best_rollout_success_rate": true
         },
-        "epoch_every_n_steps": 30,
+        "epoch_every_n_steps": 500,
         "validation_epoch_every_n_steps": 10,
         "env": null,
-        "env_delta_magnitude_limit": 1.0,
+        "env_delta_magnitude_limit": 3.0,
         "additional_envs": null,
         "render": false,
         "render_video": true,
@@ -37,8 +37,8 @@
         }
     },
     "train": {
-        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/lift/ph/all_obs_v141.hdf5",
-        "output_dir":"../bc_trained_models",
+        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/can/ph/all_obs_v141_with_aggregated_actions.hdf5",
+        "output_dir":"../bc_trained_models/diffusion_policy/sim/aggregated_action_models",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
@@ -50,10 +50,10 @@
         "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
-            "agg_actions_magnitude_1"
+            "agg_actions_magnitude_3"
         ],
         "action_keys": [
-            "agg_actions_magnitude_1"
+            "agg_actions_magnitude_3"
         ],
         "action_config": {
             "actions": {
@@ -80,7 +80,7 @@
         "goal_mode": null,
         "cuda": true,
         "batch_size": 128,
-        "num_epochs": 600,
+        "num_epochs": 1200,
         "seed": 1
     },
     "algo": {

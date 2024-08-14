@@ -1,7 +1,7 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "lift_all_obs_diffusion_policy",
+        "name": "lift_image_diffusion_policy_agg_actions_3",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -12,7 +12,7 @@
         "save": {
             "enabled": true,
             "every_n_seconds": null,
-            "every_n_epochs": 50,
+            "every_n_epochs": 100,
             "epochs": [],
             "on_best_validation": false,
             "on_best_rollout_return": false,
@@ -21,13 +21,14 @@
         "epoch_every_n_steps": 500,
         "validation_epoch_every_n_steps": 10,
         "env": null,
+        "env_delta_magnitude_limit": 3.0,
         "additional_envs": null,
         "render": false,
         "render_video": true,
         "keep_all_videos": false,
         "video_skip": 5,
         "rollout": {
-            "enabled": false,
+            "enabled": true,
             "n": 50,
             "horizon": 400,
             "rate": 50,
@@ -36,8 +37,8 @@
         }
     },
     "train": {
-        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/lift/ph/all_obs_v141.hdf5",
-        "output_dir":"../bc_trained_models/diffusion_policy",
+        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/lift/ph/all_obs_v141_with_aggregated_actions.hdf5",
+        "output_dir":"../bc_trained_models/diffusion_policy/sim/aggregated_action_models",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
@@ -49,12 +50,37 @@
         "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
-            "actions"
+            "agg_actions_magnitude_3"
         ],
+        "action_keys": [
+            "agg_actions_magnitude_3"
+        ],
+        "action_config": {
+            "actions": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            },
+            "agg_actions_magnitude_1": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            },
+            "agg_actions_magnitude_2": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            },
+            "agg_actions_magnitude_3": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            },
+            "agg_actions_magnitude_4": {
+                "normalization": "min_max",
+                "rot_conversion": null
+            }
+        },
         "goal_mode": null,
         "cuda": true,
         "batch_size": 128,
-        "num_epochs": 600,
+        "num_epochs": 1200,
         "seed": 1
     },
     "algo": {
@@ -109,9 +135,6 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "robot0_eef_pos",
-                    "robot0_eef_quat",
-                    "robot0_gripper_qpos"
                 ],
                 "rgb": [
                     "agentview_image",

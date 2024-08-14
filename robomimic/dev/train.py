@@ -117,7 +117,7 @@ def train(config, device, auto_remove_exp=False):
             env_meta['env_kwargs']['controller_configs']['input_min'] = -delta_act_magnitude_limit
             env_meta['env_kwargs']['controller_configs']['input_max'] = delta_act_magnitude_limit
 
-            scale_action_min = [-0.05 * delta_act_magnitude_limit for i in range(3)] + [0.5 * delta_act_magnitude_limit for i in range(3)]
+            scale_action_min = [-0.05 * delta_act_magnitude_limit for i in range(3)] + [-0.5 * delta_act_magnitude_limit for i in range(3)]
             env_meta['env_kwargs']['controller_configs']['output_min'] = scale_action_min
             scale_action_max = [0.05 * delta_act_magnitude_limit for i in range(3)] + [0.5 * delta_act_magnitude_limit for i in range(3)]
             env_meta['env_kwargs']['controller_configs']['output_max'] = scale_action_max
@@ -133,11 +133,6 @@ def train(config, device, auto_remove_exp=False):
             env = EnvUtils.wrap_env_from_config(env, config=config) # apply environment warpper, if applicable
             envs[env.name] = env
             print(envs[env.name])
-
-            print("Created Environment")
-            print("========================================================================================")
-            print(env)
-            print("========================================================================================")
 
 
     print("")
