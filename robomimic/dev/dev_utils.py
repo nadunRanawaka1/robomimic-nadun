@@ -165,6 +165,7 @@ def create_aggregated_delta_actions_with_gripper_check(actions, obs, **kw_args):
     agg_actions = []
     gripper_vel = obs['robot0_gripper_qvel'][:]*100
 
+    # Define maximum magnitude of delta action
     delta_action_magnitude_limit = kw_args.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
 
     for i in range(0, actions.shape[0]):
@@ -174,16 +175,16 @@ def create_aggregated_delta_actions_with_gripper_check(actions, obs, **kw_args):
                 # Magnitude is too large, stop aggregating
                 break
 
-            gripper_same = True
+            gripper_moving = False
             if max(np.abs(gripper_vel[j])) > GRIPPER_VELOCITY_THRESHOLD:
-                gripper_same = False
+                gripper_moving = True
 
-            if in_same_direction(actions[j], curr_action) and gripper_same:
-                # If actions are in the same direction and the gripper action does not change, aggregate
+            if in_same_direction(actions[j], curr_action) and not gripper_moving:
+                # If actions are in the same direction and the gripper is not moving
                 curr_action[0:6] += deepcopy(actions[j][0:6])
                 curr_action[-1] = deepcopy(actions[j][-1])
             else:
-                # Either not in same direction or gripper action changes, stop aggregating
+                # Either not in same direction or gripper is moving, stop aggregating
                 break
 
         agg_actions.append(curr_action)
