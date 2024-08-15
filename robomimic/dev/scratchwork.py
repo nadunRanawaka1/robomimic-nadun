@@ -1,8 +1,13 @@
 import os
 import nexusformat.nexus as nx
+import h5py
 
-demo_fn = "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/square/ph/all_obs_v141.hdf5"
-demo_file = nx.nxload(demo_fn)
-print(demo_file.tree)
+demo_fn = "/home/robot-aiml/ac_learning_repos/Task_Demos/merged/demo_put_strawberry_in_bowl.hdf5"
+# demo_file = nx.nxload(demo_fn)
+# print(demo_file.tree)
+demo_file = h5py.File(demo_fn)
+aa_actions = demo_file['data/demo_0/absolute_axis_angle_actions'][:]
+
+
 
 print()

@@ -301,7 +301,7 @@ class DiffusionPolicyUNet(PolicyAlgo):
             # put actions into the queue
             self.action_queue.extend(action_sequence[0])
 
-        if kwargs["return_action_sequence"]:
+        if kwargs.get("return_action_sequence", False):
             Ta = self.algo_config.horizon.action_horizon
             self.action_queue = deque(maxlen=Ta)
             return action_sequence
@@ -338,11 +338,17 @@ class DiffusionPolicyUNet(PolicyAlgo):
             'obs': obs_dict,
             'goal': goal_dict
         }
-        for k in self.obs_shapes:
-            # first two dimensions should be [B, T] for inputs
-            assert inputs['obs'][k].ndim - 2 == len(self.obs_shapes[k])
-        obs_features = TensorUtils.time_distributed(inputs, self.nets['policy']['obs_encoder'], inputs_as_kwargs=True)
-        assert obs_features.ndim == 3  # [B, T, D]
+        # If we use framestack, make sure the input is structured correctly
+        # TODO: this needs to be fixed in upstream
+        if self.global_config.train.frame_stack > 1:
+            for k in self.obs_shapes:
+                # first two dimensions should be [B, T] for inputs
+                assert inputs['obs'][k].ndim - 2 == len(self.obs_shapes[k])
+            obs_features = TensorUtils.time_distributed(inputs, self.nets['policy']['obs_encoder'], inputs_as_kwargs=True)
+            assert obs_features.ndim == 3  # [B, T, D]
+        else:
+            # no framestack, therefore just get the features from encoder
+            obs_features = self.nets['policy']['obs_encoder'](**inputs) # [T, D]
         B = obs_features.shape[0]
 
         # reshape observation to (B,obs_horizon*obs_dim)

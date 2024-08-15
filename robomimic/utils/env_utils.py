@@ -47,6 +47,9 @@ def get_env_class(env_meta=None, env_type=None, env=None):
     elif env_type == EB.EnvType.GPRS_REAL_TYPE:
         from robomimic.envs.env_real_panda_gprs import EnvRealPandaGPRS
         return EnvRealPandaGPRS
+    elif env_type == EB.EnvType.UR5_REAL_TYPE:
+        from robomimic.envs.env_real_ur5 import EnvRealUR5
+        return EnvRealUR5
     raise Exception("code should never reach this point")
 
 
@@ -164,7 +167,8 @@ def is_real_robot_env(env_meta=None, env_type=None, env=None):
     Determines whether the environment is a real robot environment. Accepts
     either env_meta, env_type, or env.
     """
-    return check_env_type(type_to_check=EB.EnvType.REAL_TYPE, env_meta=env_meta, env_type=env_type, env=env)
+    return (check_env_type(type_to_check=EB.EnvType.REAL_TYPE, env_meta=env_meta, env_type=env_type, env=env)
+            or check_env_type(type_to_check=EB.EnvType.UR5_REAL_TYPE, env_meta=env_meta, env_type=env_type, env=env))
 
 
 def is_real_robot_gprs_env(env_meta=None, env_type=None, env=None):
