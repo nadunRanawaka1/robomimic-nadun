@@ -243,7 +243,6 @@ def rollout(
     return stats, traj
 
 
-def rollout_with_action_sequence
 
 def run_trained_agent(args):
 
