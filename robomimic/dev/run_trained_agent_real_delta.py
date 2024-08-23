@@ -247,7 +247,7 @@ def rollout(
 
 def rollout_with_action_sequence(policy, env, horizon, render=False, video_writer=None, video_skip=5,
         return_obs=False, camera_names=None, real=False,
-        rollout_demo=False, rollout_demo_obs=False, demo=None, demo_act_key="absolute_axis_angle_actions"):
+        rollout_demo=False, rollout_demo_obs=False, demo=None, demo_act_key="delta_joint_positions"):
     """
     Helper function to carry out rollouts. Supports on-screen rendering, off-screen rendering to a video,
     and returns the rollout trajectory.
