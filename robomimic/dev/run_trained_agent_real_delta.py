@@ -53,6 +53,7 @@ Example usage:
 """
 import argparse
 import json
+import pickle
 import time
 
 import h5py
@@ -247,7 +248,7 @@ def rollout(
 
 def rollout_with_action_sequence(policy, env, horizon, render=False, video_writer=None, video_skip=5,
         return_obs=False, camera_names=None, real=False,
-        rollout_demo=False, rollout_demo_obs=False, demo=None, demo_act_key="absolute_axis_angle_actions"):
+        rollout_demo=False, rollout_demo_obs=False, demo=None, demo_act_key="delta_joint_positions"):
     """
     Helper function to carry out rollouts. Supports on-screen rendering, off-screen rendering to a video,
     and returns the rollout trajectory.
@@ -318,7 +319,12 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
     env.robot_interface.switch_to_joint_traj_controller()
 
     action_sequence_length = policy.policy.algo_config.horizon.action_horizon
-    run_actions = 4
+    run_actions = 20
+
+    env.robot_interface.reset_joint_position_messages()
+    inf_time_list = []
+    traj_publish_times = []
+    inf_durations = []
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
@@ -335,10 +341,18 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
             start_inf = time.time()
             act = policy(ob=obs, **kwargs) # Act will be sequence (N, act_dim)
 
+            # TODO SINCE THIS IS DELTA JOINT POSITION, WE ADD THE CURRENT JOINT POSITION TO THE MODEL PREDS
+            new_act = np.cumsum(act, axis=0)
+            new_act[:, -1] = act[:, -1]
+            new_act[:, :-1] += obs['joint_positions']
+            act = np.copy(new_act)
 
             if step_i == 0: # TODO Find a better way of handling this
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
-            print(f"Time taken for inf: {time.time() - start}")
+
+            inf_dur = time.time() - start
+            # print(f"Time taken for inf: {inf_dur}")
+            inf_durations.append(inf_dur)
 
             np.set_printoptions(precision=8)
 
@@ -354,6 +368,9 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
                 # diff += np.abs(act - demo_act)
                 # print("diff is {}".format(diff))
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
+
+            inf_time_list.append(kwargs["inf_start_time"])
+
 
             if not kwargs['step_action_sequence']:
                 for i in range(act.shape[0]):
@@ -374,6 +391,8 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
             # compute reward
             total_reward += r
             success = env.is_success()["task"]
+
+            traj_publish_times.append(env.robot_interface.get_previous_traj_publish_time())
 
             # visualization
             if render:
@@ -420,9 +439,10 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
             # step_i += action_sequence_length
             step_i += run_actions
 
-
     except env.rollout_exceptions as e:
         print("WARNING: got rollout exception {}".format(e))
+
+    joint_position_messages = env.robot_interface.get_joint_positions_messages()
 
     stats = dict(Return=total_reward, Horizon=(step_i + 1), Success_Rate=float(success))
 
@@ -441,6 +461,12 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
         else:
             traj[k] = np.array(traj[k])
 
+    traj["inf_start_times"] = inf_time_list
+    traj["traj_publish_times"] = traj_publish_times
+    traj["all_joint_msg"] = joint_position_messages
+    traj['traj_point_time'] = env.robot_interface.j_point_time
+    traj['run_actions'] = run_actions
+    traj["inf_durations"] = inf_durations
     return stats, traj
 
 def run_trained_agent(args):
@@ -502,13 +528,14 @@ def run_trained_agent(args):
     # maybe open hdf5 to write rollouts
     write_dataset = (args.dataset_path is not None)
     if write_dataset:
-        data_writer = h5py.File(args.dataset_path, "w")
-        data_grp = data_writer.create_group("data")
-        total_samples = 0
+        # data_writer = h5py.File(args.dataset_path, "w")
+        # data_grp = data_writer.create_group("data")
+        # total_samples = 0
+        rollout_data = {}
 
     rollout_stats = []
 
-    rollout_horizon = 300 #TODO remove this
+    rollout_horizon = 200 #TODO remove this
 
 
     for i in range(rollout_num_episodes):
@@ -551,21 +578,35 @@ def run_trained_agent(args):
 
         if write_dataset:
             # store transitions
-            ep_data_grp = data_grp.create_group("demo_{}".format(i))
-            ep_data_grp.create_dataset("actions", data=np.array(traj["actions"]))
-            ep_data_grp.create_dataset("states", data=np.array(traj["states"]))
-            ep_data_grp.create_dataset("rewards", data=np.array(traj["rewards"]))
-            ep_data_grp.create_dataset("dones", data=np.array(traj["dones"]))
-            if args.dataset_obs:
-                for k in traj["obs"]:
-                    ep_data_grp.create_dataset("obs/{}".format(k), data=np.array(traj["obs"][k]))
-                    ep_data_grp.create_dataset("next_obs/{}".format(k), data=np.array(traj["next_obs"][k]))
 
+            rollout_data["demo_{}".format(i)] = traj
+
+            # rollout_data["demo_{}".format(i)]["actions"] = traj["actions"]
+            # rollout_data["demo_{}".format(i)]["states"] = traj["states"]
+            # rollout_data["demo_{}".format(i)]["rewards"] = traj["rewards"]
+            # rollout_data["demo_{}".format(i)]["dones"] = traj["dones"]
+            #
+            # rollout_data["demo_{}".format(i)]["traj_start_times"] = traj["traj_start_times"]
+
+            # ep_data_grp = data_grp.create_group("demo_{}".format(i))
+            # ep_data_grp.create_dataset("actions", data=np.array(traj["actions"]))
+            # ep_data_grp.create_dataset("states", data=np.array(traj["states"]))
+            # ep_data_grp.create_dataset("rewards", data=np.array(traj["rewards"]))
+            # ep_data_grp.create_dataset("dones", data=np.array(traj["dones"]))
+            # if args.dataset_obs:
+            #     rollout_data["demo_{}".format(i)]["obs"] = {}
+            #     for k in traj["obs"]:
+            #         rollout_data["demo_{}".format(i)]["obs"][k] = traj["obs"][k]
+
+                    # ep_data_grp.create_dataset("obs/{}".format(k), data=np.array(traj["obs"][k]))
+                    # ep_data_grp.create_dataset("next_obs/{}".format(k), data=np.array(traj["next_obs"][k]))
+
+            # rollout_data["demo_{}".format(i)]["obs"]["all_joint_msg"] = traj["all_joint_msg"]
             # episode metadata
-            if "model" in traj["initial_state_dict"]:
-                ep_data_grp.attrs["model_file"] = traj["initial_state_dict"]["model"] # model xml for this episode
-            ep_data_grp.attrs["num_samples"] = traj["actions"].shape[0] # number of transitions in this episode
-            total_samples += traj["actions"].shape[0]
+            # if "model" in traj["initial_state_dict"]:
+            #     ep_data_grp.attrs["model_file"] = traj["initial_state_dict"]["model"] # model xml for this episode
+            # ep_data_grp.attrs["num_samples"] = traj["actions"].shape[0] # number of transitions in this episode
+            # total_samples += traj["actions"].shape[0]
 
     rollout_stats = TensorUtils.list_of_flat_dict_to_dict_of_list(rollout_stats)
     avg_rollout_stats = { k : np.mean(rollout_stats[k]) for k in rollout_stats }
@@ -578,9 +619,11 @@ def run_trained_agent(args):
 
     if write_dataset:
         # global metadata
-        data_grp.attrs["total"] = total_samples
-        data_grp.attrs["env_args"] = json.dumps(env.serialize(), indent=4) # environment info
-        data_writer.close()
+        # data_grp.attrs["total"] = total_samples
+        # data_grp.attrs["env_args"] = json.dumps(env.serialize(), indent=4) # environment info
+        # data_writer.close()
+        with open(args.dataset_path, "wb") as f:
+            pickle.dump(rollout_data, f)
         print("Wrote dataset trajectories to {}".format(args.dataset_path))
 
 
@@ -753,7 +796,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=3,
+        default=2,
         help="number of rollouts",
     )
 
@@ -833,8 +876,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_absolute_axis_actions_image_only/20240808154229/models/model_epoch_600.pth"
+    args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_delta_joint_actions/20240822192410/models/model_epoch_250.pth"
 
-    # args.dataset_path = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_joint_position_trajectory_traj_replacement_2x_speed.hdf5"
+    args.dataset_path = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_delta_joint_actions/20240822192410/logs/rollout_4x.pkl"
 
     run_trained_agent(args)
     #

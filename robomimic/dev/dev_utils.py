@@ -16,7 +16,7 @@ REPEAT_LAST_ACTION_TIMES = 10
 def demo_obs_to_obs_dict(demo_obs, ind):
     obs_dict = {}
     for o in demo_obs:
-        obs_dict[o] = demo_obs[o][ind]
+        obs_dict[o] = np.array(demo_obs[o][ind])
     return obs_dict
 
 def in_same_direction(act1, act2, threshold=DELTA_ACTION_DIRECTION_THRESHOLD):
