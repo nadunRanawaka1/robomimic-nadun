@@ -335,6 +335,7 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
             start_inf = time.time()
             act = policy(ob=obs, **kwargs) # Act will be sequence (N, act_dim)
 
+
             if step_i == 0: # TODO Find a better way of handling this
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
             print(f"Time taken for inf: {time.time() - start}")
@@ -832,7 +833,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_absolute_axis_actions_image_only/20240808154229/models/model_epoch_600.pth"
-    args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/models/model_epoch_750.pth"
 
     # args.dataset_path = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_joint_position_trajectory_traj_replacement_2x_speed.hdf5"
 
