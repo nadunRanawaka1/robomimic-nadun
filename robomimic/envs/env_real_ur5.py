@@ -29,7 +29,8 @@ class EnvRealUR5(EB.EnvBase):
                  postprocess_visual_obs=True,
                  debug=False,
                  config=None,
-                 obs_shapes = None):
+                 obs_shapes = None,
+                 data = None):
 
         #TODO maybe pass in Env Config to init function
         if config is None:

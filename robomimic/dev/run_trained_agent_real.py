@@ -89,7 +89,6 @@ import h5py
 
 
 
-
 def rollout(
         policy, env, horizon, render=False, video_writer=None, video_skip=5,
         return_obs=False, camera_names=None, real=False,
@@ -111,7 +110,10 @@ def rollout(
         camera_names (list): determines which camera(s) are used for rendering. Pass more than
             one to output a video with multiple camera views concatenated horizontally.
         real (bool): if real robot rollout
-        rollout_demo: to use observations and/or actions from demos instead of actual observations
+        rollout_demo: to use actions from demo instead of actual actions
+        rollout_demo_obs: to use obs from the demo and rollout instead of actual obs
+        demo: demo to use for rolling out actions or obs
+        demo_act_key: which actions to rollout from demo if rolling out demo actions
 
     Returns:
         stats (dict): some statistics for the rollout - such as return, horizon, and task success
@@ -146,6 +148,9 @@ def rollout(
     total_reward = 0.
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     diff = np.array([0, 0, 0, 0, 0, 0, 0, 0], dtype=float)
+
+    # TODO: MOVE THIS
+    kw_args = {"return_action_sequence": False}
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
@@ -155,11 +160,11 @@ def rollout(
             if rollout_demo_obs:
                 obs = demo_obs_to_obs_dict(demo['obs'], step_i)
             else:
-                obs = env.get_observation(obs)
+                obs = env.get_observation()
             # get action from policy
-            act = policy(ob=obs)
+            act = policy(ob=obs, **kw_args)
             np.set_printoptions(precision=8)
-            print("action from policy is: {}".format(act))
+            print("Run_Trained_Agent_real: action from policy is: {}".format(act))
 
             if rollout_demo:
                 demo_act = demo[demo_act_key][step_i]
@@ -237,6 +242,8 @@ def rollout(
 
     return stats, traj
 
+
+
 def run_trained_agent(args):
 
     # some arg checking
@@ -267,9 +274,9 @@ def run_trained_agent(args):
     # create environment from saved checkpoint
 
         #TODO adding in hardcoded metadata for UR5 env, implement this correctly in the data collection loop
-        ckpt_dict['env_metadata']['type'] = 5
-        ckpt_dict['env_metadata']["env_kwargs"] = {}
-        ckpt_dict['env_metadata']['env_name'] = "UR5_REAL_TYPE"
+        # ckpt_dict['env_metadata']['type'] = 5
+        # ckpt_dict['env_metadata']["env_kwargs"] = {}
+        # ckpt_dict['env_metadata']['env_name'] = "UR5_REAL_TYPE"
         env, _ = FileUtils.env_from_checkpoint(
         ckpt_dict=ckpt_dict, 
         env_name=args.env, 
@@ -302,9 +309,10 @@ def run_trained_agent(args):
 
     rollout_stats = []
 
-    rollout_horizon = 10000 #TODO remove this
-    for i in range(rollout_num_episodes):
+    rollout_horizon = 60 #TODO remove this
 
+
+    for i in range(rollout_num_episodes):
         try:
             stats, traj = rollout(
                 policy=policy, 
@@ -418,7 +426,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--video_skip",
         type=int,
-        default=5,
+        default=1,
         help="render frames to video every n steps",
     )
 
@@ -427,7 +435,7 @@ if __name__ == "__main__":
         "--camera_names",
         type=str,
         nargs='+',
-        default=["side_view_camera_rgb"],
+        default=["sideview_left_camera_rgb"],
         help="(optional) camera name(s) to use for rendering on-screen or to video",
     )
 
@@ -457,6 +465,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # args.agent = "/mnt/Data/atrp_ac_learning/skynet_trained_models/bc_trained_models/review_experiments_final/cone_loading_bc_rnn_gmm_42_demos_5_22_absolute_aa_actions/20240523002000/models/model_epoch_340.pth"
+    args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_absolute_actions/20240808154840/models/model_epoch_250.pth"
 
     run_trained_agent(args)
