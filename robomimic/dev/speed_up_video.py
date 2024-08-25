@@ -2,8 +2,8 @@ from moviepy.editor import VideoFileClip
 import moviepy.video.fx.all as vfx
 
 
-orig = "/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_with_gripper_check_100.mp4"
-fast = "/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/aggregated_actions_with_gripper_check_100_5x.mp4"
+orig = "/home/nadun/Downloads/normal_rollout.mp4"
+fast = "/home/nadun/Downloads/normal_rollout_fast.mp4"
 clip = VideoFileClip(orig)
 
 clip = clip.set_fps(clip.fps*5)

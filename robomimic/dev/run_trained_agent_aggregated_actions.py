@@ -222,11 +222,17 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
     slowdown_mode = False
     start_rollout = time.time()
 
+
+    actions_remaining = horizon
+
+
+
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
     try:
-        for step_i in range(horizon):
+        while actions_remaining > 0:
+            # TODO: fix step_i and horizon for return action sequence
 
             # get action from policy
             start = time.time()
@@ -254,6 +260,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                     for act in agg_actions:
                         next_obs, r, done, _ = env.step(act)
                         num_actual_actions += 1
+                        actions_remaining -= 1
                         if video_writer is not None:
                             if video_count % video_skip == 0:
                                 video_img = []
@@ -271,6 +278,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                         a = act[i]
                         next_obs, r, done, _ = env.step(a)
                         num_actual_actions += 1
+                        actions_remaining -= 1
                         if video_writer is not None:
                             if video_count % video_skip == 0:
                                 video_img = []
@@ -287,6 +295,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                 # Model returns a single action, play it here
                 next_obs, r, done, _ = env.step(act)
                 num_actual_actions += 1
+                actions_remaining -= 1
 
             # compute reward
             total_reward += r
@@ -396,6 +405,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     total_inference_time = 0
 
+    print(f'HORIZON IS : {horizon}')
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
@@ -625,12 +635,17 @@ def evaluate_aggregated_actions(args):
     scale_action_limits = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
 
 
-    kp_values = [100 + i*10 for i in range(21)]
+    delta_action_magnitude_limits = [1.0, 2.0, 3.0]
+    delta_epsilon = np.array([1e-7, 1e-7, 1e-7])
+    delta_action_direction_threshold = 0.25
+    scale_action_limits = [0.05, 0.10, 0.15]
+
+
     df = None
 
     kw_args = {"return_action_sequence": False, "aggregate_actions": False, "delta_action_direction_threshold": 0.25,
-               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
-               "delta_action_magnitude_limit": 1.0, "kp": 150}
+               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.10,
+               "delta_action_magnitude_limit": 2.0, "kp": 150}
 
     ### TODO: TESTING NORMAL ROLLOUTS
     args.video_path = f"{args.video_dir}/normal_rollout.mp4"
@@ -644,7 +659,7 @@ def evaluate_aggregated_actions(args):
 
     ### TODO: TESTING AGGREGATED ROLLOUTS
 
-    check_gripper = True
+    check_gripper = False
 
     kw_args = {"return_action_sequence": True, "aggregate_actions": True, "delta_action_direction_threshold": 0.25,
                "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
@@ -708,7 +723,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=5,
+        default=100,
         help="number of rollouts",
     )
 
@@ -818,7 +833,7 @@ if __name__ == "__main__":
         args.video_dir = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'videos'))
 
     if args.rollout_stats_path is None:
-        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'aggregated_eval_with_gripper_check.xlsx'))
+        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'aggregated_eval.xlsx'))
 
     # if args.evaluate_control_freqs:
     #     evaluate_over_control_freqs(args)
