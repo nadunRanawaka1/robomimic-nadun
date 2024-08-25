@@ -3,6 +3,8 @@ Real robot env wrapper for UR5 robot
 """
 #Library imports
 import json
+import time
+
 import numpy as np
 
 
@@ -25,11 +27,12 @@ class EnvRealUR5(EB.EnvBase):
                  render_offscreen=False,
                  use_image_obs=True,
                  use_depth_obs=False,
-                 control_freq=20.0,
+                 control_freq=40.0,
                  postprocess_visual_obs=True,
                  debug=False,
                  config=None,
-                 obs_shapes = None):
+                 obs_shapes = None,
+                 data = None):
 
         #TODO maybe pass in Env Config to init function
         if config is None:
@@ -89,6 +92,7 @@ class EnvRealUR5(EB.EnvBase):
         self.timers.tic("real_ur5_step")
 
         self.robot_interface.step(action, **kwargs)
+
 
         obs = None
         if need_obs:
