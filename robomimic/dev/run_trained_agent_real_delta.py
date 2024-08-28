@@ -314,7 +314,7 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
     # kwargs = {"return_action_sequence": True, "step_action_sequence": False,
     #           "control_mode": "Joint_Position"}
     kwargs = {"return_action_sequence": True, "step_action_sequence": True,
-              "control_mode": "Joint_Position_Trajectory"}
+              "control_mode": "Joint_Position_Trajectory", "delta_model": True}
 
     env.robot_interface.switch_to_joint_traj_controller()
 
@@ -341,11 +341,12 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
             start_inf = time.time()
             act = policy(ob=obs, **kwargs) # Act will be sequence (N, act_dim)
 
-            # TODO SINCE THIS IS DELTA JOINT POSITION, WE ADD THE CURRENT JOINT POSITION TO THE MODEL PREDS
-            new_act = np.cumsum(act, axis=0)
-            new_act[:, -1] = act[:, -1]
-            new_act[:, :-1] += obs['joint_positions']
-            act = np.copy(new_act)
+            if kwargs["delta_model"]:
+                # TODO SINCE THIS IS DELTA JOINT POSITION, WE ADD THE CURRENT JOINT POSITION TO THE MODEL PREDS
+                new_act = np.cumsum(act, axis=0)
+                new_act[:, -1] = act[:, -1]
+                new_act[:, :-1] += obs['joint_positions']
+                act = np.copy(new_act)
 
             if step_i == 0: # TODO Find a better way of handling this
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()

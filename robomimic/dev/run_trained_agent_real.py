@@ -54,6 +54,8 @@ Example usage:
 import argparse
 import json
 import time
+import pickle
+import math
 
 import h5py
 import imageio
@@ -78,6 +80,8 @@ from robomimic.dev.dev_utils import demo_obs_to_obs_dict
 import matplotlib.pyplot as plt
 
 import h5py
+from scipy.interpolate import UnivariateSpline
+from scipy import spatial
 # import nexusformat.nexus as nx
 
 # demo_fn = "/mnt/Data/atrp_ac_learning/demos/merged_demos/demo_foam_cube_generalizable.hdf5"
@@ -305,26 +309,40 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
 
     video_count = 0  # video frame counter
     total_reward = 0.
-    traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
+    traj = dict(actions=[], rewards=[], dones=[], states=[], pred_actions=[], initial_state_dict=state_dict)
     diff = np.array([0, 0, 0, 0, 0, 0, 0], dtype=float)
     step_i = 0
 
     # TODO: MOVE THIS
-    # kwargs = {"return_action_sequence": True, "step_action_sequence": False,
-    #           "control_mode": "Joint_Position"}
     kwargs = {"return_action_sequence": True, "step_action_sequence": True,
-              "control_mode": "Joint_Position_Trajectory"}
+              "control_mode": "Joint_Position_Trajectory", "delta_model": False,
+              "temporal_ensemble": True, "spline": False}
 
     env.robot_interface.switch_to_joint_traj_controller()
 
     action_sequence_length = policy.policy.algo_config.horizon.action_horizon
-    run_actions = 4
+    run_actions = 6
+    drop_actions = 4
+
+    prev_action = None
+    last_time_sent_actions = time.time()
+
+
+    ### DATA COLLECTION STUFF
+
+    env.robot_interface.reset_joint_position_messages()
+    inf_time_list = []
+    traj_publish_times = []
+    inf_durations = []
+    pred_actions = []
+
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
     try:
         while step_i < horizon:
             start = time.time()
+
             if rollout_demo_obs:
                 obs = demo_obs_to_obs_dict(demo['obs'], step_i)
                 obs = env.get_observation(obs)
@@ -333,26 +351,95 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
             # get action from policy
             kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
             start_inf = time.time()
+
+            time_since_last_sent_actions = time.time() - last_time_sent_actions
+
             act = policy(ob=obs, **kwargs) # Act will be sequence (N, act_dim)
+            act_diff = act[1:] - act[:-1]
+            traj["pred_actions"].append(act)
+            if run_actions >= 16:
+                kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
+
+            inf_time = time.time() - start
+
+            inf_durations.append(inf_time)
+            if kwargs["delta_model"]:
+                # TODO SINCE THIS IS DELTA JOINT POSITION, WE ADD THE CURRENT JOINT POSITION TO THE MODEL PREDS
+                new_act = np.cumsum(act, axis=0)
+                new_act[:, -1] = act[:, -1]
+                new_act[:, :-1] += obs['joint_positions']
+                act = np.copy(new_act)
 
 
             if step_i == 0: # TODO Find a better way of handling this
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
-            print(f"Time taken for inf: {time.time() - start}")
+            else:
+
+               if kwargs['temporal_ensemble']:
+                   prev_act_weight = 1.0
+                   prev_act_weights = [1.0, 1.0, 1.0, 1.0, 0.9, 0.8, 0.6, 0.3, 0.1, 0.1, 0, 0]
+                   prev_weight_index = 0
+                   # TODO trying kdtree
+
+
+                   # this is the pointer to where we are in the previous action traj
+                   prev_action_index = math.ceil(time_since_last_sent_actions / env.robot_interface.j_point_time)
+                   weighted_act = deepcopy(act)
+
+                   # this is the pointer to where we are in the current prediction's traj
+                   new_action_index = math.ceil(inf_time/env.robot_interface.j_point_time)
+                   new_action_start = deepcopy(new_action_index)
+                   # for i in range(curr_action_pointer, curr_action_pointer + weighted_act.shape[0] - prev_action_pointer):
+                   #     weighted_act[i] *= 1 - prev_act_weight
+                   #     weighted_act[i] += prev_action[prev_action_pointer] * prev_act_weight
+                   #     prev_act_weight -= 0.1
+                   #     prev_act_weight = max(0, prev_act_weight)
+                   #     prev_action_pointer += 1
+                   prev_action_start = run_actions + 1
+                   for i in range(prev_action_index,  prev_action.shape[0]):
+                       prev_act_weight = prev_act_weights[prev_weight_index]
+                       prev_weight_index += 1
+                       weighted_act[new_action_index] *= 1 - prev_act_weight
+                       weighted_act[new_action_index] += prev_action[i] * prev_act_weight
+                       # prev_act_weight -= 0.1
+                       # prev_act_weight = max(0, prev_act_weight)
+                       new_action_index += 1
+                       # prev_action_pointer += 1
+                   # smooth_actions = act.shape[0] - executed_actions
+
+
+                   act = weighted_act
+                   act = act[new_action_start:]
+
+            if kwargs["spline"]:
+
+                curr_state = env.robot_interface.joint_position[np.newaxis, ...]
+                j_act = act[drop_actions:, :-1]
+                j_act = np.concatenate([curr_state, j_act], axis=0)
+                x = range(act.shape[0])
+                for d in range(j_act.shape[1]):
+                    y = j_act[:, d]
+                    spline = UnivariateSpline(x, y, s=0.5)
+                    new_y = spline(x)
+                    j_act[:, d] = new_y
+                act = np.concatenate([j_act, act[drop_actions:, -1]], axis=1)
+
+
+
+            inf_time_list.append(kwargs["inf_start_time"])
+            print(f"Time taken for inf: {inf_time}")
+
+            prev_action = act
 
             np.set_printoptions(precision=8)
 
             if rollout_demo:
                 demo_act = demo[demo_act_key][step_i: step_i+ action_sequence_length]
-                # diff += np.abs(act - demo_act)
-                # print("diff is {}".format(diff))
                 act = demo_act
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
 
             if rollout_demo_obs:
                 demo_act = demo[demo_act_key][step_i: step_i + action_sequence_length]
-                # diff += np.abs(act - demo_act)
-                # print("diff is {}".format(diff))
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
 
             if not kwargs['step_action_sequence']:
@@ -364,6 +451,7 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
                     time.sleep(env.robot_interface.j_point_time)
             else:
                 # play action
+                last_time_sent_actions = time.time()
                 next_obs, r, done, _ = env.step(act, **kwargs)
                 if rollout_demo or rollout_demo_obs:
                     time.sleep(action_sequence_length*env.robot_interface.j_point_time)
@@ -374,6 +462,8 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
             # compute reward
             total_reward += r
             success = env.is_success()["task"]
+
+            traj_publish_times.append(env.robot_interface.get_previous_traj_publish_time())
 
             # visualization
             if render:
@@ -441,6 +531,15 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
         else:
             traj[k] = np.array(traj[k])
 
+    joint_position_messages = env.robot_interface.get_joint_positions_messages()
+    traj["inf_start_times"] = inf_time_list
+    traj["traj_publish_times"] = traj_publish_times
+    traj["all_joint_msg"] = joint_position_messages
+    traj['traj_point_time'] = env.robot_interface.j_point_time
+    traj['run_actions'] = run_actions
+    traj["inf_durations"] = inf_durations
+    traj["skip_joint_actions"] = env.robot_interface.skip_joint_actions
+
     return stats, traj
 
 def run_trained_agent(args):
@@ -502,12 +601,13 @@ def run_trained_agent(args):
     # maybe open hdf5 to write rollouts
     write_dataset = (args.dataset_path is not None)
     if write_dataset:
-        data_writer = h5py.File(args.dataset_path, "w")
-        data_grp = data_writer.create_group("data")
-        total_samples = 0
+        # data_writer = h5py.File(args.dataset_path, "w")
+        # data_grp = data_writer.create_group("data")
+        # total_samples = 0
+
+        rollout_data = {}
 
     rollout_stats = []
-
     rollout_horizon = 300 #TODO remove this
 
 
@@ -551,21 +651,24 @@ def run_trained_agent(args):
 
         if write_dataset:
             # store transitions
-            ep_data_grp = data_grp.create_group("demo_{}".format(i))
-            ep_data_grp.create_dataset("actions", data=np.array(traj["actions"]))
-            ep_data_grp.create_dataset("states", data=np.array(traj["states"]))
-            ep_data_grp.create_dataset("rewards", data=np.array(traj["rewards"]))
-            ep_data_grp.create_dataset("dones", data=np.array(traj["dones"]))
-            if args.dataset_obs:
-                for k in traj["obs"]:
-                    ep_data_grp.create_dataset("obs/{}".format(k), data=np.array(traj["obs"][k]))
-                    ep_data_grp.create_dataset("next_obs/{}".format(k), data=np.array(traj["next_obs"][k]))
 
-            # episode metadata
-            if "model" in traj["initial_state_dict"]:
-                ep_data_grp.attrs["model_file"] = traj["initial_state_dict"]["model"] # model xml for this episode
-            ep_data_grp.attrs["num_samples"] = traj["actions"].shape[0] # number of transitions in this episode
-            total_samples += traj["actions"].shape[0]
+            rollout_data["demo_{}".format(i)] = traj
+
+            # ep_data_grp = data_grp.create_group("demo_{}".format(i))
+            # ep_data_grp.create_dataset("actions", data=np.array(traj["actions"]))
+            # ep_data_grp.create_dataset("states", data=np.array(traj["states"]))
+            # ep_data_grp.create_dataset("rewards", data=np.array(traj["rewards"]))
+            # ep_data_grp.create_dataset("dones", data=np.array(traj["dones"]))
+            # if args.dataset_obs:
+            #     for k in traj["obs"]:
+            #         ep_data_grp.create_dataset("obs/{}".format(k), data=np.array(traj["obs"][k]))
+            #         ep_data_grp.create_dataset("next_obs/{}".format(k), data=np.array(traj["next_obs"][k]))
+            #
+            # # episode metadata
+            # if "model" in traj["initial_state_dict"]:
+            #     ep_data_grp.attrs["model_file"] = traj["initial_state_dict"]["model"] # model xml for this episode
+            # ep_data_grp.attrs["num_samples"] = traj["actions"].shape[0] # number of transitions in this episode
+            # total_samples += traj["actions"].shape[0]
 
     rollout_stats = TensorUtils.list_of_flat_dict_to_dict_of_list(rollout_stats)
     avg_rollout_stats = { k : np.mean(rollout_stats[k]) for k in rollout_stats }
@@ -578,9 +681,11 @@ def run_trained_agent(args):
 
     if write_dataset:
         # global metadata
-        data_grp.attrs["total"] = total_samples
-        data_grp.attrs["env_args"] = json.dumps(env.serialize(), indent=4) # environment info
-        data_writer.close()
+        # data_grp.attrs["total"] = total_samples
+        # data_grp.attrs["env_args"] = json.dumps(env.serialize(), indent=4) # environment info
+        # data_writer.close()
+        with open(args.dataset_path, "wb") as f:
+            pickle.dump(rollout_data, f)
         print("Wrote dataset trajectories to {}".format(args.dataset_path))
 
 
@@ -720,7 +825,6 @@ def run_trained_agent_with_demo(args):
         i += 1
 
 
-
     rollout_stats = TensorUtils.list_of_flat_dict_to_dict_of_list(rollout_stats)
     avg_rollout_stats = { k : np.mean(rollout_stats[k]) for k in rollout_stats }
     avg_rollout_stats["Num_Success"] = np.sum(rollout_stats["Success_Rate"])
@@ -753,7 +857,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=3,
+        default=2,
         help="number of rollouts",
     )
 
@@ -832,9 +936,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_absolute_axis_actions_image_only/20240808154229/models/model_epoch_600.pth"
+    args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/models/model_epoch_750.pth"
 
-    # args.dataset_path = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_joint_position_trajectory_traj_replacement_2x_speed.hdf5"
+    # args.dataset_path = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_no_traj_replacement_1x_speed_no_skipping_large_delay.pkl"
 
     run_trained_agent(args)
     #
