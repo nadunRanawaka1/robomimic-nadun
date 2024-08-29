@@ -23,6 +23,8 @@ log_fn = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/real_robot/l
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_blended_actions_traj_replacement_half_speed_drop_action_testing.pkl"
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_blended_actions_traj_replacement_1x_speed_drop_action.pkl"
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_blended_actions_traj_replacement_half_speed_drop_action.pkl"
+log_fn = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/real_robot/logs/rollout_blended_actions_traj_replacement_1x_speed_drop_action.pkl"
+# log_fn = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/real_robot/logs/rollout_blended_actions_traj_replacement_half_speed_drop_action.pkl"
 
 with open(log_fn, "rb") as f:
     log = pickle.load(f)
@@ -81,12 +83,12 @@ for i, time in enumerate(demo['traj_start_times']):
     pred_x_list.append(pred_x)
 
 
+for i, X in enumerate(pred_x_list):
+    plt.plot(X, pred_y_list[i], label="predictions", ls='None', marker=f'${str(i)}$', color="orange", markersize=12)
+    plt.plot(obs_x_list[i], obs_y_list[i], label="joint state at time of prediction", ls='None', marker=f'${str(i)}$', color='red', markersize=14)
+#
 for i, X in enumerate(actual_x_list):
     plt.plot(X, actual_y_list[i], label="blended actions", ls="None", marker=f'${str(i)}$', markersize=8, color="green")
-#
-for i, X in enumerate(pred_x_list):
-    plt.plot(X, pred_y_list[i], label="predictions", ls='None', marker=f'${str(i)}$', color="orange")
-    plt.plot(obs_x_list[i], obs_y_list[i], label="joint state at time of prediction", ls='None', marker=f'${str(i)}$', color='red', markersize=8)
 
 
 
