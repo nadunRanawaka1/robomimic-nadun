@@ -338,6 +338,8 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
     inf_durations = []
     pred_actions = []
     obs_joint_pos = []
+    prev_actions_completed = []
+    drop_action_list = []
 
     if return_obs:
         # store observations too
@@ -346,20 +348,23 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
         while step_i < horizon:
             start = time.time()
 
+
             if rollout_demo_obs:
                 obs = demo_obs_to_obs_dict(demo['obs'], step_i)
                 obs = env.get_observation(obs)
             else:
-                kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
                 obs = env.get_observation()
             # get action from policy
 
             obs_joint_pos.append(obs["joint_positions"])
 
             start_inf = time.time()
+            kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
+
             act = policy(ob=obs, **kwargs) # Act will be sequence (N, act_dim)
 
             traj["pred_actions"].append(act)
+
             if run_actions >= act.shape[0]:
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
 
@@ -373,52 +378,45 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
                 new_act[:, :-1] += obs['joint_positions']
                 act = np.copy(new_act)
 
-
             if step_i == 0: # TODO Find a better way of handling this
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
             else:
+                if kwargs['temporal_ensemble']:
+                    prev_act_weights = [1.0, 0.9, 0.8, 0.6, 0.4, 0.3, 0.1, 0.1, 0, 0, 0, 0, 0]
+                    prev_weight_index = 0
+                    time_since_last_sent_actions = time.time() - last_time_sent_actions
+                    # this is the pointer to where we are in the previous action traj, and where the actual robot is
+                    prev_action_index = math.ceil(time_since_last_sent_actions / env.robot_interface.j_point_time)
+                    prev_actions_completed.append(prev_action_index)
+                    blended_act = deepcopy(act)
 
-               if kwargs['temporal_ensemble']:
-                   prev_act_weights = [1.0, 1.0, 0.9, 0.8, 0.6, 0.4, 0.3, 0.1, 0.1, 0, 0, 0]
-                   prev_weight_index = 0
-                   time_since_last_sent_actions = time.time() - last_time_sent_actions
-                   # this is the pointer to where we are in the previous action traj, and where the actual robot is
-                   prev_action_index = math.ceil(time_since_last_sent_actions / env.robot_interface.j_point_time)
-                   weighted_act = deepcopy(act)
+                    # this is the pointer to where we are in the current prediction's traj
+                    new_action_index = math.ceil(inf_time/env.robot_interface.j_point_time)
+                    drop_actions = deepcopy(new_action_index)
+                    kwargs['drop_actions'] = drop_actions
+                    drop_action_list.append(drop_actions)
 
-                   # this is the pointer to where we are in the current prediction's traj
-                   new_action_index = math.ceil(inf_time/env.robot_interface.j_point_time)
-                   drop_actions = deepcopy(new_action_index)
-                   kwargs['drop_actions'] = drop_actions
+                    while prev_action_index < prev_action.shape[0] and new_action_index < blended_act.shape[0]:
+                        prev_act_weight = prev_act_weights[prev_weight_index]
+                        prev_weight_index += 1
+                        blended_act[new_action_index] *= 1 - prev_act_weight
+                        blended_act[new_action_index] += prev_action[prev_action_index] * prev_act_weight
 
-                   for i in range(prev_action_index,  prev_action.shape[0]):
-                       prev_act_weight = prev_act_weights[prev_weight_index]
-                       prev_weight_index += 1
-                       weighted_act[new_action_index] *= 1 - prev_act_weight
-                       weighted_act[new_action_index] += prev_action[i] * prev_act_weight
+                        prev_action_index += 1
+                        new_action_index += 1
 
-                       new_action_index += 1
-                       # prev_action_pointer += 1
-                   # smooth_actions = act.shape[0] - executed_actions
-
-
-                   act = weighted_act
-                   # act = act[new_action_start:]
+                    act = blended_act
 
             if kwargs["spline"]:
 
-                curr_state = env.robot_interface.joint_position[np.newaxis, ...]
-                j_act = act[drop_actions:, :-1]
-                j_act = np.concatenate([curr_state, j_act], axis=0)
-                x = range(act.shape[0])
-                for d in range(j_act.shape[1]):
+                j_act = act[:, :-1]
+                x = range(j_act.shape[0])
+                for d in range(act.shape[1]):
                     y = j_act[:, d]
                     spline = UnivariateSpline(x, y, s=0.5)
                     new_y = spline(x)
                     j_act[:, d] = new_y
-                act = np.concatenate([j_act, act[drop_actions:, -1]], axis=1)
-
-
+                act = np.concatenate([j_act, act[:, -1]], axis=1)
 
             inf_time_list.append(kwargs["inf_start_time"])
             print(f"Time taken for inf: {inf_time}")
@@ -453,7 +451,6 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
                     sleep_time = run_actions * env.robot_interface.j_point_time - (time.time() - last_time_sent_actions)
                     print(f"Sleep time is : {sleep_time}")
                     time.sleep(sleep_time)
-
 
             # compute reward
             total_reward += r
@@ -539,6 +536,8 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
     traj["inf_durations"] = inf_durations
     traj["skip_joint_actions"] = env.robot_interface.skip_joint_actions
     traj['obs_joint_pos'] = obs_joint_pos
+    traj['prev_actions_completed'] = prev_actions_completed
+    traj['drop_action_list'] = drop_action_list
 
 
     return stats, traj
@@ -609,7 +608,7 @@ def run_trained_agent(args):
         rollout_data = {}
 
     rollout_stats = []
-    rollout_horizon = 150 #TODO remove this
+    rollout_horizon = 200 #TODO remove this
 
 
     for i in range(rollout_num_episodes):
@@ -939,7 +938,7 @@ if __name__ == "__main__":
 
     args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/models/model_epoch_750.pth"
 
-    args.dataset_path = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_blended_actions_traj_replacement_half_speed_drop_action.pkl"
+    args.dataset_path = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_blended_actions_traj_replacement_1x_speed_drop_action.pkl"
 
     run_trained_agent(args)
     #
