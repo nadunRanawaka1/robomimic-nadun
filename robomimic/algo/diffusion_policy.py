@@ -7,6 +7,7 @@ from collections import OrderedDict, deque
 from packaging.version import parse as parse_version
 import copy
 
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,6 +22,11 @@ import robomimic.utils.torch_utils as TorchUtils
 import robomimic.utils.obs_utils as ObsUtils
 
 from robomimic.algo import register_algo_factory_func, PolicyAlgo
+
+import random
+import robomimic.utils.torch_utils as TorchUtils
+import robomimic.utils.tensor_utils as TensorUtils
+import robomimic.utils.obs_utils as ObsUtils
 
 @register_algo_factory_func("diffusion_policy")
 def algo_config_to_class(algo_config):
@@ -47,6 +53,9 @@ class DiffusionPolicyUNet(PolicyAlgo):
         """
         Creates networks and places them into @self.nets.
         """
+        if self.algo_config.language_conditioned:
+            self.obs_shapes["lang_emb"] = [768] # clip is 768-dim embedding
+
         # set up different observation groups for @MIMO_MLP
         observation_group_shapes = OrderedDict()
         observation_group_shapes["obs"] = OrderedDict(self.obs_shapes)
@@ -305,7 +314,7 @@ class DiffusionPolicyUNet(PolicyAlgo):
             Ta = self.algo_config.horizon.action_horizon
             self.action_queue = deque(maxlen=Ta)
             return action_sequence
-        
+
         # has action, execute from left to right
         # [Da]
         action = self.action_queue.popleft()
@@ -402,8 +411,9 @@ class DiffusionPolicyUNet(PolicyAlgo):
         """
         self.nets.load_state_dict(model_dict["nets"])
         if model_dict.get("ema", None) is not None:
+
             self.ema.load_state_dict(model_dict["ema"])
-        
+
 
 # =================== Vision Encoder Utils =====================
 def replace_submodules(

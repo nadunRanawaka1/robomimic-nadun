@@ -93,14 +93,15 @@ def obs_encoder_kwargs_from_config(obs_encoder_config):
     # Unlock encoder config
     obs_encoder_config.unlock()
     for obs_modality, encoder_kwargs in obs_encoder_config.items():
-        # First run some sanity checks and store the classes
-        for cls_name, cores in zip(("core", "obs_randomizer"), (OBS_ENCODER_CORES, OBS_RANDOMIZERS)):
-            # Make sure the requested encoder for each obs_modality exists
-            cfg_cls = encoder_kwargs[f"{cls_name}_class"]
-            if cfg_cls is not None:
-                assert cfg_cls in cores, f"No {cls_name} class with name {cfg_cls} found, must register this class before" \
-                    f"creating model!"
-                # encoder_kwargs[f"{cls_name}_class"] = cores[cfg_cls]
+        ###  TODO: fix sanity checks. Disabling this code snippet to allow chaining multiple randomizers.
+        # # First run some sanity checks and store the classes
+        # for cls_name, cores in zip(("core", "obs_randomizer"), (OBS_ENCODER_CORES, OBS_RANDOMIZERS)):
+        #     # Make sure the requested encoder for each obs_modality exists
+        #     cfg_cls = encoder_kwargs[f"{cls_name}_class"]
+        #     if cfg_cls is not None:
+        #         assert cfg_cls in cores, f"No {cls_name} class with name {cfg_cls} found, must register this class before" \
+        #             f"creating model!"
+        #         # encoder_kwargs[f"{cls_name}_class"] = cores[cfg_cls]
 
         # Process core and randomizer kwargs
         encoder_kwargs.core_kwargs = dict() if encoder_kwargs.core_kwargs is None else \
@@ -488,11 +489,11 @@ def normalize_dict(dict, normalization_stats):
         offset = normalization_stats[m]["offset"][0]
         scale = normalization_stats[m]["scale"][0]
 
-        # shape consistency checks
-        m_num_dims = len(offset.shape)
-        shape_len_diff = len(dict[m].shape) - m_num_dims
-        assert shape_len_diff >= 0, "shape length mismatch in @normalize_dict"
-        assert dict[m].shape[-m_num_dims:] == offset.shape, "shape mismatch in @normalize_dict"
+        # check shape consistency
+        shape_len_diff = len(offset.shape) - len(dict[m].shape)
+        assert shape_len_diff in [0, 1], "shape length mismatch in @normalize_dict"
+        # if dict has no leading batch dim, check shapes match exactly, else allow first dim to broadcast
+        assert offset.shape[1:] == dict[m].shape[(1 - shape_len_diff):], "shape mismatch in @normalize_dict"
 
         # dict can have one or more leading batch dims - prepare for broadcasting
         reshape_padding = tuple([1] * shape_len_diff)
@@ -530,11 +531,11 @@ def unnormalize_dict(dict, normalization_stats):
         offset = normalization_stats[m]["offset"][0]
         scale = normalization_stats[m]["scale"][0]
 
-        # shape consistency checks
-        m_num_dims = len(offset.shape)
-        shape_len_diff = len(dict[m].shape) - m_num_dims
-        assert shape_len_diff >= 0, "shape length mismatch in @unnormalize_dict"
-        assert dict[m].shape[-m_num_dims:] == offset.shape, "shape mismatch in @unnormalize_dict"
+        # check shape consistency
+        shape_len_diff = len(offset.shape) - len(dict[m].shape)
+        assert shape_len_diff in [0, 1], "shape length mismatch in @unnormalize_dict"
+        # if dict has no leading batch dim, check shapes match exactly, else allow first dim to broadcast
+        assert offset.shape[1:] == dict[m].shape[(1 - shape_len_diff):], "shape mismatch in @unnormalize_dict"
 
         # dict can have one or more leading batch dims - prepare for broadcasting
         reshape_padding = tuple([1] * shape_len_diff)

@@ -24,6 +24,8 @@ from robomimic.models.base_nets import *
 from robomimic.utils.vis_utils import visualize_image_randomizer
 from robomimic.macros import VISUALIZE_RANDOMIZER
 
+import torchvision.transforms.functional as TVF
+from torchvision.transforms import Lambda, Compose
 
 """
 ================================================

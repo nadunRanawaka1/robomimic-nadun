@@ -88,7 +88,13 @@ class BaseConfig(Config):
         self.experiment.logging.log_wandb = False                   # enable wandb logging
         self.experiment.logging.wandb_proj_name = "debug"           # project name if using wandb
 
-
+        # log model prediction MSE
+        self.experiment.mse.enabled = False                         # whether to log model prediction MSE
+        self.experiment.mse.every_n_epochs = 50                     # log model prediction MSE every n epochs
+        self.experiment.mse.on_save_ckpt = True                     # log model prediction MSE on model checkpoint
+        self.experiment.mse.num_samples = 20                        # number of datapoints to use for MSE prediction
+        self.experiment.mse.visualize = True                        # save model prediction visualizations
+                
         ## save config - if and when to save model checkpoints ##
         self.experiment.save.enabled = True                         # whether model saving should be enabled or disabled
         self.experiment.save.every_n_seconds = None                 # save model every n seconds (set to None to disable)
@@ -124,12 +130,17 @@ class BaseConfig(Config):
         self.experiment.rollout.rate = 50                           # do rollouts every @rate epochs
         self.experiment.rollout.warmstart = 0                       # number of epochs to wait before starting rollouts
         self.experiment.rollout.terminate_on_success = True         # end rollout early after task success
+        self.experiment.rollout.batched = False                     # whether to parallelize evaluations over batched environments
+        self.experiment.rollout.num_batch_envs = 5                  # number of batched environments to use (applicable if experiment.rollout.batched is True)
 
 
 
         # for updating the evaluation env meta data
         self.experiment.env_meta_update_dict = Config()
         self.experiment.env_meta_update_dict.do_not_lock_keys()
+
+        # whether to load in a previously trained model checkpoint
+        self.experiment.ckpt_path = None
 
     def train_config(self):
         """
@@ -225,7 +236,14 @@ class BaseConfig(Config):
         self.train.num_epochs = 2000    # number of training epochs
         self.train.seed = 1             # seed for training (for reproducibility)
 
+        self.train.max_grad_norm = None  # clip gradient norms (see `backprop_for_loss` function in torch_utils.py) 
+
         self.train.data_format = "robomimic" # either "robomimic" or "r2d2"
+
+        # list of observation keys to shuffle randomly in the dataset.
+        # must be list of tuples pairs, with each pair representing
+        # the corresponding observation key groups to shuffle
+        self.train.shuffled_obs_key_groups = None
 
     def algo_config(self):
         """

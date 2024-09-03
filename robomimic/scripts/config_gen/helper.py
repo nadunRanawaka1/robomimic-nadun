@@ -65,6 +65,36 @@ def set_env_settings(generator, args):
             group=-1,
             values=[50],
         )
+        generator.add_param(
+            key="experiment.mse.enabled",
+            name="",
+            group=-1,
+            values=[True],
+        ),
+        generator.add_param(
+            key="experiment.mse.every_n_epochs",
+            name="",
+            group=-1,
+            values=[50],
+        ),
+        generator.add_param(
+            key="experiment.mse.on_save_ckpt",
+            name="",
+            group=-1,
+            values=[True],
+        ),
+        generator.add_param(
+            key="experiment.mse.num_samples",
+            name="",
+            group=-1,
+            values=[20],
+        ),
+        generator.add_param(
+            key="experiment.mse.visualize",
+            name="",
+            group=-1,
+            values=[True],
+        ),
         if "observation.modalities.obs.low_dim" not in generator.parameters:
             generator.add_param(
                 key="observation.modalities.obs.low_dim",
@@ -81,12 +111,35 @@ def set_env_settings(generator, args):
                 group=-1,
                 values=[
                     [
-                        "camera/image/hand_camera_image",
-                        # "camera/image/varied_camera_1_image", "camera/image/varied_camera_2_image" # uncomment to use all 3 cameras
+                        "camera/image/hand_camera_left_image",
+                        "camera/image/varied_camera_1_left_image", "camera/image/varied_camera_2_left_image" # uncomment to use all 3 cameras
                     ]
                 ],
             )
-        if "observation.encoder.rgb.obs_randomizer_kwargs.crop_height"  not in generator.parameters:
+        generator.add_param(
+            key="observation.encoder.rgb.obs_randomizer_class",
+            name="obsrand",
+            group=-1,
+            values=[
+                # "CropRandomizer", # crop only
+                # "ColorRandomizer", # jitter only
+                ["ColorRandomizer", "CropRandomizer"], # jitter, followed by crop
+            ],
+            hidename=True,
+        )
+        generator.add_param(
+            key="observation.encoder.rgb.obs_randomizer_kwargs",
+            name="obsrandargs",
+            group=-1,
+            values=[
+                # {"crop_height": 116, "crop_width": 116, "num_crops": 1, "pos_enc": False}, # crop only
+                # {}, # jitter only
+                [{}, {"crop_height": 116, "crop_width": 116, "num_crops": 1, "pos_enc": False}], # jitter, followed by crop
+            ],
+            hidename=True,
+        )
+        if ("observation.encoder.rgb.obs_randomizer_kwargs" not in generator.parameters) and \
+            ("observation.encoder.rgb.obs_randomizer_kwargs.crop_height" not in generator.parameters):
             generator.add_param(
                 key="observation.encoder.rgb.obs_randomizer_kwargs.crop_height",
                 name="",
@@ -103,6 +156,25 @@ def set_env_settings(generator, args):
                     116
                 ],
             )
+        # remove spatial softmax by default for r2d2 dataset
+        generator.add_param(
+            key="observation.encoder.rgb.core_kwargs.pool_class",
+            name="",
+            group=-1,
+            values=[
+                None
+            ],
+        )
+        generator.add_param(
+            key="observation.encoder.rgb.core_kwargs.pool_kwargs",
+            name="",
+            group=-1,
+            values=[
+                None
+            ],
+        )
+
+        # specify dataset type is r2d2 rather than default robomimic
         generator.add_param(
             key="train.data_format",
             name="",
@@ -111,7 +183,7 @@ def set_env_settings(generator, args):
                 "r2d2"
             ],
         )
-        # specify action keys in your <yourmethod>_gen.py
+        
         # here, we list how each action key should be treated (normalized etc)
         generator.add_param(
             key="train.action_config",
@@ -128,15 +200,28 @@ def set_env_settings(generator, args):
                     "action/abs_rot_6d":{
                         "normalization": "min_max",
                         "format": "rot_6d",
+                        "convert_at_runtime": "rot_euler",
                     },
-                    "action/abs_rot_axis_angle":{
+                    "action/abs_rot_euler":{
                         "normalization": "min_max",
-                        "format": "rot_axis_angle",
+                        "format": "rot_euler",
                     },
                     "action/gripper_position":{
                         "normalization": "min_max",
                     },
                     "action/cartesian_velocity":{
+                        "normalization": None,
+                    },
+                    "action/rel_pos":{
+                        "normalization": None,
+                    },
+                    "action/rel_rot_6d":{
+                        "format": "rot_6d",
+                        "normalization": None,
+                        "convert_at_runtime": "rot_euler",
+                    },
+                    "action/rel_rot_euler":{
+                        "format": "rot_euler",
                         "normalization": None,
                     },
                     "action/gripper_velocity":{
@@ -151,6 +236,120 @@ def set_env_settings(generator, args):
             group=-1,
             values=[[]],
         )
+        if "train.action_keys" not in generator.parameters:
+            generator.add_param(
+                key="train.action_keys",
+                name="ac_keys",
+                group=-1,
+                values=[
+                    [
+                        "action/rel_pos",
+                        "action/rel_rot_euler",
+                        "action/gripper_velocity",
+                    ],
+                ],
+                value_names=[
+                    "rel",
+                ],
+            )
+        # observation key groups to swap
+        generator.add_param(
+            key="train.shuffled_obs_key_groups",
+            name="",
+            group=-1,
+            values=[[[
+                (
+                "camera/image/varied_camera_1_left_image",
+                "camera/image/varied_camera_1_right_image",
+                "camera/extrinsics/varied_camera_1_left",
+                "camera/extrinsics/varied_camera_1_right",
+                ),
+                (
+                "camera/image/varied_camera_2_left_image",
+                "camera/image/varied_camera_2_right_image",
+                "camera/extrinsics/varied_camera_2_left",
+                "camera/extrinsics/varied_camera_2_right",
+                ),  
+            ]]],
+        )
+    elif args.env == "kitchen":
+        generator.add_param(
+            key="train.action_config",
+            name="",
+            group=-1,
+            values=[
+                {
+                    "actions":{
+                        "normalization": None,
+                    },
+                    "action_dict/abs_pos": {
+                        "normalization": "min_max"
+                    },
+                    "action_dict/abs_rot_axis_angle": {
+                        "normalization": "min_max",
+                        "format": "rot_axis_angle"
+                    },
+                    "action_dict/abs_rot_6d": {
+                        "normalization": None,
+                        "format": "rot_6d"
+                    },
+                    "action_dict/rel_pos": {
+                        "normalization": None,
+                    },
+                    "action_dict/rel_rot_axis_angle": {
+                        "normalization": None,
+                        "format": "rot_axis_angle"
+                    },
+                    "action_dict/rel_rot_6d": {
+                        "normalization": None,
+                        "format": "rot_6d"
+                    },
+                    "action_dict/gripper": {
+                        "normalization": None,
+                    },
+                    "action_dict/base_mode": {
+                        "normalization": None,
+                    }
+                }
+            ],
+        )
+        
+        if args.mod == 'im':
+            generator.add_param(
+                key="observation.modalities.obs.low_dim",
+                name="",
+                group=-1,
+                values=[
+                    ["robot0_eef_pos",
+                     "robot0_eef_quat",
+                     "robot0_base_pos",
+                     "robot0_gripper_qpos"]
+                ],
+            )
+            generator.add_param(
+                key="observation.modalities.obs.rgb",
+                name="",
+                group=-1,
+                values=[
+                    ["robot0_agentview_left_image",
+                     "robot0_agentview_right_image",
+                     "robot0_eye_in_hand_image"]
+                ],
+            )
+        else:
+            generator.add_param(
+                key="observation.modalities.obs.low_dim",
+                name="",
+                group=-1,
+                values=[
+                    ["robot0_eef_pos",
+                     "robot0_eef_quat",
+                     "robot0_gripper_qpos",
+                     "robot0_base_pos",
+                     "object",
+                    ]
+                ],
+            )
     elif args.env in ['square', 'lift', 'place_close']:
         # # set videos off
         # args.no_video = True
@@ -449,7 +648,7 @@ def set_mod_settings(generator, args):
                 key="experiment.save.every_n_epochs",
                 name="",
                 group=-1,
-                values=[20],
+                values=[40],
             )
 
         generator.add_param(
@@ -490,7 +689,7 @@ def set_mod_settings(generator, args):
                 key="experiment.rollout.rate",
                 name="",
                 group=-1,
-                values=[20],
+                values=[40],
             )
 
 
@@ -498,6 +697,20 @@ def set_debug_mode(generator, args):
     if not args.debug:
         return
 
+    generator.add_param(
+        key="experiment.mse.every_n_epochs",
+        name="",
+        group=-1,
+        values=[2],
+        value_names=[""],
+    )
+    generator.add_param(
+        key="experiment.mse.visualize",
+        name="",
+        group=-1,
+        values=[True],
+        value_names=[""],
+    )
     generator.add_param(
         key="experiment.rollout.n",
         name="",
@@ -575,6 +788,35 @@ def set_debug_mode(generator, args):
         group=-1,
         values=[3],
     )
+
+
+def set_output_dir(generator, args):
+    assert args.name is not None
+
+    vals = generator.parameters["train.output_dir"].values
+
+    for i in range(len(vals)):
+        vals[i] = os.path.join(vals[i], args.name)
+
+
+def set_wandb_mode(generator, args):
+    generator.add_param(
+        key="experiment.logging.log_wandb",
+        name="",
+        group=-1,
+        values=[not args.no_wandb],
+    )
+
+
+def set_num_seeds(generator, args):
+    if args.n_seeds is not None and "train.seed" not in generator.parameters:
+        generator.add_param(
+            key="train.seed",
+            name="seed",
+            group=-10,
+            values=[i + 1 for i in range(args.n_seeds)],
+            prepend=True,
+        )
 
 
 def get_argparser():
@@ -691,6 +933,9 @@ def make_generator(args, make_generator_helper):
 
     set_env_settings(generator, args)
     set_mod_settings(generator, args)
+    set_output_dir(generator, args)
+    set_num_seeds(generator, args)
+    set_wandb_mode(generator, args)
 
     # set the debug settings last, to override previous setting changes
     set_debug_mode(generator, args)
@@ -706,4 +951,4 @@ def make_generator(args, make_generator_helper):
     )
 
     # generate jsons and script
-    generator.generate()
+    generator.generate(override_base_name=True)

@@ -18,6 +18,7 @@ except ImportError:
     pass
 
 import robomimic.utils.obs_utils as ObsUtils
+import robomimic.utils.lang_utils as LangUtils
 import robomimic.envs.env_base as EB
 
 # protect against missing mujoco-py module, since robosuite might be using mujoco-py or DM backend
@@ -36,8 +37,9 @@ class EnvRobosuite(EB.EnvBase):
         render=False, 
         render_offscreen=False, 
         use_image_obs=False, 
-        use_depth_obs=False,
         postprocess_visual_obs=True,
+        lang=None,
+        use_depth_obs=False,
         **kwargs,
     ):
         """
@@ -61,6 +63,8 @@ class EnvRobosuite(EB.EnvBase):
             postprocess_visual_obs (bool): if True, postprocess image observations
                 to prepare for learning. This should only be False when extracting observations
                 for saving to a dataset (to save space on RGB images for example).
+
+            lang: TODO add documentation
         """
         self.postprocess_visual_obs = postprocess_visual_obs
         self.use_depth_obs = use_depth_obs
@@ -105,6 +109,9 @@ class EnvRobosuite(EB.EnvBase):
         self._env_name = env_name
         self._init_kwargs = deepcopy(kwargs)
         self.env = robosuite.make(self._env_name, **kwargs)
+        self.base_env = self.env # for mimicgen
+        self.lang = lang
+        self._lang_emb = LangUtils.get_lang_emb(self.lang)
 
         if self._is_v1:
             # Make sure joint position observations and eef vel observations are active
@@ -127,6 +134,7 @@ class EnvRobosuite(EB.EnvBase):
         """
         obs, r, done, info = self.env.step(action)
         obs = self.get_observation(obs)
+        info["is_success"] = self.is_success()
         return obs, r, self.is_done(), info
 
     def reset(self):
@@ -138,6 +146,11 @@ class EnvRobosuite(EB.EnvBase):
         """
         di = self.env.reset()
         return self.get_observation(di)
+
+    #notifies the environment whether or not the next environemnt testing object should update its category
+    def update_env(self, attr, value):
+        self.env.attr = value
+
 
     def reset_to(self, state):
         """
@@ -154,6 +167,14 @@ class EnvRobosuite(EB.EnvBase):
         """
         should_ret = False
         if "model" in state:
+            if state.get("ep_meta", None) is not None:
+                # set relevant episode information
+                ep_meta = json.loads(state["ep_meta"])
+                self.env.set_attrs_from_ep_meta(ep_meta)
+
+            # this reset is necessary.
+            # while the call to env.reset_from_xml_string does call reset,
+            # that is only a "soft" reset that doesn't actually reload the model.
             self.reset()
             robosuite_version_id = int(robosuite.__version__.split(".")[1])
             if robosuite_version_id <= 3:
@@ -180,7 +201,7 @@ class EnvRobosuite(EB.EnvBase):
             return self.get_observation()
         return None
 
-    def render(self, mode="human", height=None, width=None, camera_name="agentview"):
+    def render(self, mode="human", height=None, width=None, camera_name=None):
         """
         Render from simulation to either an on-screen window or off-screen to RGB array.
 
@@ -190,6 +211,10 @@ class EnvRobosuite(EB.EnvBase):
             width (int): width of image to render - only used if mode is "rgb_array"
             camera_name (str): camera name to use for rendering
         """
+        # if camera_name is None, infer from initial env kwargs
+        if camera_name is None:
+            camera_name = self._init_kwargs.get("camera_names", ["agentview"])[0]
+
         if mode == "human":
             cam_id = self.env.sim.model.camera_name2id(camera_name)
             self.env.viewer.set_camera(cam_id)
@@ -258,6 +283,9 @@ class EnvRobosuite(EB.EnvBase):
             ret["eef_pos"] = np.array(di["eef_pos"])
             ret["eef_quat"] = np.array(di["eef_quat"])
             ret["gripper_qpos"] = np.array(di["gripper_qpos"])
+
+        if self._lang_emb is not None:
+            ret["lang_emb"] = np.array(self._lang_emb)
         return ret
 
     def get_real_depth_map(self, depth_map):
@@ -340,7 +368,11 @@ class EnvRobosuite(EB.EnvBase):
         """
         xml = self.env.sim.model.get_xml() # model xml file
         state = np.array(self.env.sim.get_state().flatten()) # simulator state
-        return dict(model=xml, states=state)
+        info = dict(model=xml, states=state)
+        if hasattr(self.env, "get_ep_meta"):
+            # get ep_meta if applicable
+            info["ep_meta"] = json.dumps(self.env.get_ep_meta(), indent=4)
+        return info
 
     def get_reward(self):
         """

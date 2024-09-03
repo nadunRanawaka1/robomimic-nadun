@@ -243,7 +243,6 @@ def replay_normal_speed(demo_fn, limit, video_fn=None):
     print("Replaying normal")
     env, demo_file = complete_setup_for_replay(demo_fn)
 
-
     if video_fn is not None:
         video_writer = imageio.get_writer(video_fn, fps=20)
 

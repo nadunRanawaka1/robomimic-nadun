@@ -69,6 +69,7 @@ import imageio
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
+import random
 
 import robomimic
 import robomimic.utils.obs_utils as ObsUtils
@@ -344,6 +345,9 @@ def playback_dataset(args, env=None):
 
     # maybe reduce the number of demonstrations to playback
     if args.n is not None:
+        # if not args.dont_shuffle_demos:
+        #     random.shuffle(demos)
+        random.shuffle(demos)
         demos = demos[:args.n]
 
     # maybe dump video

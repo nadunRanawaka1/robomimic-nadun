@@ -5,6 +5,7 @@ to fetch batches from hdf5 files.
 import os
 import h5py
 import numpy as np
+import random
 from copy import deepcopy
 from contextlib import contextmanager
 from collections import OrderedDict
@@ -15,6 +16,7 @@ import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.obs_utils as ObsUtils
 import robomimic.utils.action_utils as AcUtils
 import robomimic.utils.log_utils as LogUtils
+import robomimic.utils.lang_utils as LangUtils
 
 
 class SequenceDataset(torch.utils.data.Dataset):
@@ -36,6 +38,8 @@ class SequenceDataset(torch.utils.data.Dataset):
         hdf5_normalize_obs=False,
         filter_by_attribute=None,
         load_next_obs=True,
+        shuffled_obs_key_groups=None,
+        lang=None,
     ):
         """
         Dataset class for fetching sequences of experience.
@@ -85,6 +89,10 @@ class SequenceDataset(torch.utils.data.Dataset):
                 demonstrations to load
 
             load_next_obs (bool): whether to load next_obs from the dataset
+
+            shuffled_obs_key_groups (list): TODO
+
+            lang: TODO documentation
         """
         super(SequenceDataset, self).__init__()
 
@@ -108,6 +116,10 @@ class SequenceDataset(torch.utils.data.Dataset):
             self.dataset_keys = tuple(set(self.dataset_keys).union(set(self.action_keys)))
 
         self.action_config = action_config
+
+        # set up lang and language embedding
+        self.lang = lang
+        self._lang_emb = LangUtils.get_lang_emb(self.lang)
 
         self.n_frame_stack = frame_stack
         assert self.n_frame_stack >= 1
@@ -165,6 +177,11 @@ class SequenceDataset(torch.utils.data.Dataset):
                 self.hdf5_cache = None
         else:
             self.hdf5_cache = None
+
+        if shuffled_obs_key_groups is None:
+            self.shuffled_obs_key_groups = list()
+        else:
+            self.shuffled_obs_key_groups = shuffled_obs_key_groups
 
         self.close_and_delete_hdf5_handle()
 
@@ -423,8 +440,24 @@ class SequenceDataset(torch.utils.data.Dataset):
         Fetch dataset sequence @index (inferred through internal index map), using the getitem_cache if available.
         """
         if self.hdf5_cache_mode == "all":
-            return self.getitem_cache[index]
-        return self.get_item(index)
+            output = self.getitem_cache[index]
+        else:
+            output = self.get_item(index)
+
+        for (g1, g2) in self.shuffled_obs_key_groups:
+            assert len(g1) == len(g2)
+            if random.random() > 0.5:
+                # shuffle the keys accordingly
+                for (o1, o2) in zip(g1, g2):
+                    for otype in ["obs", "next_obs", "goal_obs"]:
+                        if output.get(otype, None) is None:
+                            continue
+                        if o1 not in output[otype] or o2 not in output[otype]:
+                            continue
+                        # swap values
+                        output[otype][o1], output[otype][o2] = output[otype][o2], output[otype][o1]
+
+        return output
 
     def get_item(self, index):
         """
@@ -504,6 +537,10 @@ class SequenceDataset(torch.utils.data.Dataset):
 
         # also return the sampled index
         meta["index"] = index
+
+        # language embedding
+        T = meta["actions"].shape[0]
+        meta["obs"]["lang_emb"] = np.tile(self._lang_emb, (T, 1))
 
         return meta
 
@@ -925,6 +962,10 @@ class R2D2Dataset(SequenceDataset):
         # also return the sampled index
         meta["index"] = index
 
+        # language embedding
+        T = meta["actions"].shape[0]
+        meta["obs"]["lang_emb"] = np.tile(self._lang_emb, (T, 1))
+
         return meta
 
 
@@ -934,7 +975,6 @@ class MetaDataset(torch.utils.data.Dataset):
         datasets,
         ds_weights,
         normalize_weights_by_ds_size=False,
-        ds_labels=None,
     ):
         super(MetaDataset, self).__init__()
         self.datasets = datasets
@@ -949,20 +989,6 @@ class MetaDataset(torch.utils.data.Dataset):
         # dataset will change after the datasets are already initialized
         for ds in self.datasets:
             assert ds.hdf5_cache_mode != "all"
-        
-        # compute ds_labels to one hot ids
-        if ds_labels is None:
-            self.ds_labels = ["dummy"]
-        else:
-            self.ds_labels = ds_labels
-
-        unique_labels = sorted(set(self.ds_labels))
-
-        self.ds_labels_to_ids = {}
-        for i, label in enumerate(sorted(unique_labels)):
-            one_hot_id = np.zeros(len(unique_labels))
-            one_hot_id[i] = 1.0
-            self.ds_labels_to_ids[label] = one_hot_id
 
         # TODO: comment
         action_stats = self.get_action_stats()
@@ -978,8 +1004,6 @@ class MetaDataset(torch.utils.data.Dataset):
         ind_in_ds = idx - self._ds_ind_bins[ds_ind]
         meta = self.datasets[ds_ind].__getitem__(ind_in_ds)
         meta["index"] = idx
-        ds_label = self.ds_labels[ds_ind]
-        T = meta["actions"].shape[0]
         return meta
 
     def get_ds_label(self, idx):
