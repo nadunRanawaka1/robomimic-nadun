@@ -32,7 +32,6 @@ GRIPPER_CHANGE_THRESHOLD = 0.3
 
 
 
-
 #
 # demo = nx.nxload(demo_fn)
 # print(demo.tree)
@@ -307,7 +306,7 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
 
     ### Init env
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
-    joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_position_nadun.json"
+    joint_controller_fp = "robomimic/robosuite_configs/joint_position_nadun.json"
     controller_configs = json.load(open(joint_controller_fp))
     env_meta["env_kwargs"]["controller_configs"] = controller_configs
 
@@ -372,26 +371,22 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
                 video_img = env.env.sim.render(height=512, width=512, camera_name="agentview")[::-1]
                 video_writer.append_data(video_img)
 
-
         time_taken += time.time() - start
-
-
         normal_reward += env.get_reward()
 
     if video_fn is not None:
         video_writer.close()
-    print(f"Joint position reward: {normal_reward}")
-    print(f"Time take joint position: {time_taken}")
-    print(f"Num joint position actions: {num_actions}")
 
-    print()
+    print(f"Joint position reward: {normal_reward}")
+    print(f"Time taken joint position: {time_taken}")
+    print(f"Num joint position actions: {num_actions}")
 
 
 if __name__ == "__main__":
-    demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
+    demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/square/ph/low_dim_v141.hdf5"
     ### execute functions
-    # replay_joint_position_actions(demo_fn, 200, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_200.mp4")
-    replay_by_aggregating(demo_fn, 100, aggregating_function=aggregate_delta_actions, video_fn="/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/aggregated_actions_4.mp4")
+    replay_joint_position_actions(demo_fn, 20, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_20.mp4")
+    # replay_by_aggregating(demo_fn, 100, aggregating_function=aggregate_delta_actions, video_fn="/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/aggregated_actions_4.mp4")
 
 
 
