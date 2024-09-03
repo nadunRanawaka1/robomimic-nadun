@@ -36,8 +36,8 @@
         }
     },
     "train": {
-        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/lift/ph/all_obs_v141.hdf5",
-        "output_dir":"../bc_trained_models/diffusion_policy",
+        "data": "/gv1/projects/ATRP_ACL/datasets/lift/ph/all_obs_v141.hdf5",
+        "output_dir":"/gv1/projects/ATRP_ACL/trained_models/diffusion_policy",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
