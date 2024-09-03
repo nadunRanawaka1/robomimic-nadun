@@ -1,7 +1,7 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "can_image_diffusion_policy_joint_actions",
+        "name": "tool_hang_image_diffusion_policy_joint_actions",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -36,7 +36,7 @@
         }
     },
     "train": {
-        "data": "/gv1/projects/ATRP_ACL/datasets/can/ph/all_obs_v141.hdf5",
+        "data": "/gv1/projects/ATRP_ACL/datasets/tool_hang/ph/all_obs_v141.hdf5",
         "output_dir":"/gv1/projects/ATRP_ACL/trained_models/diffusion_policy",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
