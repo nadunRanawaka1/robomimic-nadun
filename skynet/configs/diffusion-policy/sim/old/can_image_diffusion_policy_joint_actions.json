@@ -49,16 +49,22 @@
         "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
-            "joint_actions"
+            "joint_position_actions"
         ],
         "action_keys": [
-            "joint_actions"
+            "joint_position_actions"
         ],
         "action_config": {
             "absolute_actions": {
                 "normalization": "min_max"
             },
             "joint_actions": {
+                "normalization": "min_max"
+            },
+            "joint_position_actions": {
+                "normalization": "min_max"
+            },
+            "actions" : {
                 "normalization": "min_max"
             }
         },
