@@ -222,10 +222,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
     slowdown_mode = False
     start_rollout = time.time()
 
-
     actions_remaining = horizon
-
-
 
     if return_obs:
         # store observations too

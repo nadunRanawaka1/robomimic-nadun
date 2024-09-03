@@ -1,7 +1,7 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "can_image_diffusion_policy_joint_actions",
+        "name": "lift_image_diffusion_policy_joint_actions",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -36,7 +36,7 @@
         }
     },
     "train": {
-        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/can/ph/all_obs_v141.hdf5",
+        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/lift/ph/all_obs_v141.hdf5",
         "output_dir":"../bc_trained_models/diffusion_policy",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
@@ -49,16 +49,22 @@
         "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
-            "joint_actions"
+            "joint_position_actions"
         ],
         "action_keys": [
-            "joint_actions"
+            "joint_position_actions"
         ],
         "action_config": {
             "absolute_actions": {
                 "normalization": "min_max"
             },
             "joint_actions": {
+                "normalization": "min_max"
+            },
+            "joint_position_actions": {
+                "normalization": "min_max"
+            },
+            "actions" : {
                 "normalization": "min_max"
             }
         },
