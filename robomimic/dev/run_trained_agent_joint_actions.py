@@ -253,22 +253,34 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                             break
                 else:
                     # Play normal actions
-                    for i in range(act.shape[0]):
-                        a = act[i]
-                        next_obs, r, done, _ = env.step(a)
-                        num_actual_actions += 1
-                        if video_writer is not None:
-                            if video_count % video_skip == 0:
-                                video_img = []
-                                for cam_name in camera_names:
-                                    video_img.append(
-                                        env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
-                                video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
-                                video_writer.append_data(video_img)
-                            video_count += 1
-                        if done:
-                            break
-
+                    # for i in range(act.shape[0]):
+                    #     a = act[i]
+                    #     next_obs, r, done, _ = env.step(a)
+                    #     num_actual_actions += 1
+                    #     if video_writer is not None:
+                    #         if video_count % video_skip == 0:
+                    #             video_img = []
+                    #             for cam_name in camera_names:
+                    #                 video_img.append(
+                    #                     env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                    #             video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                    #             video_writer.append_data(video_img)
+                    #         video_count += 1
+                    #     if done:
+                    #         break
+                    next_obs, r, done, _ = env.step(act)
+                    num_actual_actions += 1
+                    if video_writer is not None:
+                        if video_count % video_skip == 0:
+                            video_img = []
+                            for cam_name in camera_names:
+                                video_img.append(
+                                    env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                            video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                            video_writer.append_data(video_img)
+                        video_count += 1
+                    if done:
+                        break
             else:
                 # Model returns a single action, play it here
                 next_obs = env.get_observation()
@@ -504,7 +516,7 @@ def run_trained_agent(args):
         ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
     print()
 
-    joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_position_nadun.json"
+    joint_controller_fp = "robomimic/robosuite_configs/joint_trajectory.json"
     # joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
     controller_configs = json.load(open(joint_controller_fp))
 
@@ -516,7 +528,7 @@ def run_trained_agent(args):
     # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
 
     # TODO setting kw_args for rollout here
-    kw_args = {"return_action_sequence": False, "aggregate_actions": False}
+    kw_args = {"return_action_sequence": True, "aggregate_actions": False}
 
     # read rollout settings
     rollout_num_episodes = args.n_rollouts
@@ -625,7 +637,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/lift_image_diffusion_policy/20240609000333/models/model_epoch_600.pth",
+        default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/square_image_diffusion_policy_joint_actions/20240903144531/models/model_epoch_600.pth",
+        # default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/lift_image_diffusion_policy_joint_actions/20240903151034/models/model_epoch_600.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )
@@ -634,7 +647,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=20,
+        default=1,
         help="number of rollouts",
     )
 
@@ -666,6 +679,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--video_path",
         type=str,
+        # default="bc_trained_models/diffusion_policy/lift_image_diffusion_policy_joint_actions/20240903151034/videos/custom_config_rollout.mp4",
+        # default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/square_image_diffusion_policy_joint_actions/20240903144531/videos/custom_config_rollout.mp4",
         default=None,
         help="(optional) render rollouts to this video file path",
     )
@@ -714,7 +729,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--control_freq",
         type=int,
-        default=None,
+        default=2.5,
         help="how fast to run robot",
     )
     parser.add_argument(
@@ -733,7 +748,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     # args.evaluate_control_freqs = True
-    # args.render = True
+    args.render = True
 
     run_trained_agent(args)
 

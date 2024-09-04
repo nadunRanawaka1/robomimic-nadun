@@ -1,0 +1,17 @@
+{
+    "type": "JOINT_TRAJECTORY",
+    "input_max": 1,
+    "input_min": -1,
+    "output_max": 1.0,
+    "output_min": -1.0,
+    "kp": 50,
+    "damping_ratio": 1,
+    "impedance_mode": "fixed",
+    "kp_limits": [0, 300],
+    "damping_ratio_limits": [0, 10],
+    "qpos_limits": null,
+    "interpolation": null,
+    "ramp_ratio": 0.2,
+    "trajectory_steps": 8,
+    "trajectory_timestep": 0.05
+  }

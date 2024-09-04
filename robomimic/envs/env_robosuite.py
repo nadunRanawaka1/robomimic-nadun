@@ -126,7 +126,10 @@ class EnvRobosuite(EB.EnvBase):
             info (dict): extra information
         """
         obs, r, done, info = self.env.step(action)
-        obs = self.get_observation(obs)
+        if type(obs) is list:
+            obs = self.get_observations(obs)
+        else:
+            obs = self.get_observation(obs)
         return obs, r, self.is_done(), info
 
     def reset(self):
@@ -202,6 +205,12 @@ class EnvRobosuite(EB.EnvBase):
             return im[::-1]
         else:
             raise NotImplementedError("mode={} is not implemented".format(mode))
+        
+    def get_observations(self, dis=None):
+        rets = []
+        for di in dis:
+            rets.append(self.get_observation(di))
+        return rets
 
     def get_observation(self, di=None):
         """

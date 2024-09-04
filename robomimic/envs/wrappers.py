@@ -142,6 +142,7 @@ class FrameStackWrapper(EnvWrapper):
         @self.num_frames.
         """
         # concatenate all frames per key so we return a numpy array per key
+        np.concatenate(self.obs_history["actions"], axis=0)
         return { k : np.concatenate(self.obs_history[k], axis=0) for k in self.obs_history }
 
     def cache_obs_history(self):
@@ -200,11 +201,19 @@ class FrameStackWrapper(EnvWrapper):
             info (dict): extra information
         """
         obs, r, done, info = self.env.step(action)
-        self.update_obs(obs, action=action, reset=False)
+        if len(obs) > 1:
+            for i in range(len(obs)):
+                self.update_obs(obs[i], action=action, reset=False)
         # update frame history
-        for k in obs:
-            # make sure to have leading dim of 1 for easy concatenation
-            self.obs_history[k].append(obs[k][None])
+        if len(obs) > 1:
+            for i in range(len(obs)):
+                for k in obs[i]:
+                    # make sure to have leading dim of 1 for easy concatenation
+                    self.obs_history[k].append(obs[i][k][None])
+        else:
+            for k in obs:
+                    # make sure to have leading dim of 1 for easy concatenation
+                    self.obs_history[k].append(obs[k][None])
         obs_ret = self._get_stacked_obs_from_history()
         return obs_ret, r, done, info
 
@@ -212,7 +221,7 @@ class FrameStackWrapper(EnvWrapper):
         obs["timesteps"] = np.array([self.timestep])
         
         if reset:
-            obs["actions"] = np.zeros(self.env.action_dimension)
+            obs["actions"] = np.zeros((8,self.env.action_dimension))
         else:
             self.timestep += 1
             obs["actions"] = action[: self.env.action_dimension]
