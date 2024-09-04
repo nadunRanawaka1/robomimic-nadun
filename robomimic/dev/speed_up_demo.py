@@ -306,7 +306,9 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
 
     ### Init env
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
+    from robomimic.robosuite_configs.paths import joint_position as jp_path
     joint_controller_fp = "/media/nadun/Data/phd_project/robomimic/robomimic/robosuite_configs/joint_position_nadun.json"
+    joint_controller_fp = jp_path()
     controller_configs = json.load(open(joint_controller_fp))
     env_meta["env_kwargs"]["controller_configs"] = controller_configs
 
