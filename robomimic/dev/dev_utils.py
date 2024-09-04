@@ -1,5 +1,13 @@
 import numpy as np
 from copy import deepcopy
+import time
+import robomimic.utils.tensor_utils as TensorUtils
+import robomimic.utils.obs_utils as ObsUtils
+from robomimic.envs.env_base import EnvBase
+from robomimic.envs.wrappers import EnvWrapper
+from robomimic.algo import RolloutPolicy
+
+
 ### Setup some constants
 # TODO: find best way to handle these constants
 DELTA_ACTION_MAGNITUDE_LIMIT = 4.0
@@ -12,6 +20,7 @@ GRIPPER_VELOCITY_THRESHOLD = 0.5
 GRIPPER_COMMAND_CHANGE_THRESHOLD = 0.2
 
 REPEAT_LAST_ACTION_TIMES = 10
+
 
 def demo_obs_to_obs_dict(demo_obs, ind):
     obs_dict = {}
@@ -48,13 +57,13 @@ def in_same_direction(act1, act2, threshold=DELTA_ACTION_DIRECTION_THRESHOLD):
     else:
         return False
 
-def aggregate_delta_actions(actions, obs=None, **kw_args):
+def aggregate_delta_actions(actions, obs=None, **kwargs):
     actions = np.array(actions)
     agg_actions = []
     curr_action = actions[0]
 
-    delta_action_magnitude_limit = kw_args.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
-    delta_action_direction_threshold = kw_args.get('delta_action_direction_threshold', DELTA_ACTION_DIRECTION_THRESHOLD)
+    delta_action_magnitude_limit = kwargs.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
+    delta_action_direction_threshold = kwargs.get('delta_action_direction_threshold', DELTA_ACTION_DIRECTION_THRESHOLD)
 
     for i in range(1, actions.shape[0]):
         if sum(np.abs(curr_action[0:3])) > delta_action_magnitude_limit:
@@ -88,7 +97,7 @@ def aggregate_delta_actions(actions, obs=None, **kw_args):
     agg_actions.append(curr_action)
     return agg_actions
 
-def aggregate_delta_actions_naive(actions, obs=None):
+def aggregate_delta_actions_naive(actions, obs=None, **kwargs):
     actions = np.array(actions)
     agg_actions = []
     curr_action = actions[0]
@@ -160,13 +169,13 @@ def gripper_command_changed(gripper_traj, last_gripper_act):
         return False
 
 
-def create_aggregated_delta_actions_with_gripper_check(actions, obs, **kw_args):
+def create_aggregated_delta_actions_with_gripper_check(actions, obs, **kwargs):
 
     agg_actions = []
     gripper_vel = obs['robot0_gripper_qvel'][:]*100
 
     # Define maximum magnitude of delta action
-    delta_action_magnitude_limit = kw_args.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
+    delta_action_magnitude_limit = kwargs.get('delta_action_magnitude_limit', DELTA_ACTION_MAGNITUDE_LIMIT)
 
     for i in range(0, actions.shape[0]):
         curr_action = deepcopy(actions[i])
@@ -189,3 +198,113 @@ def create_aggregated_delta_actions_with_gripper_check(actions, obs, **kw_args):
 
         agg_actions.append(curr_action)
     return np.array(agg_actions)
+
+
+def rollout_open_loop_bc_rnn_joint_actions(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kwargs):
+    assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
+    assert isinstance(policy, RolloutPolicy)
+    assert not (render and (video_writer is not None))
+
+    policy.start_episode()
+    env.reset()
+    state_dict = env.get_state()
+
+    # hack that is necessary for robosuite tasks for deterministic action playback
+    obs = env.reset_to(state_dict)
+
+    results = {}
+    video_count = 0  # video frame counter
+    total_reward = 0.
+    traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
+    total_inference_time = 0
+
+    start_rollout = time.time()
+
+    rollout_length = policy.policy.algo_config.rnn.horizon
+    num_actual_actions = 0
+
+    if return_obs:
+        # store observations too
+        traj.update(dict(obs=[], next_obs=[]))
+    try:
+        for step_i in range(horizon):
+
+            # get action from policy
+            start = time.time()
+            actions = []
+            if kwargs["return_action_sequence"]:
+                for i in range(rollout_length):
+                    act = policy(ob=obs)
+                    actions.append(act)
+            else:
+                act = policy(ob=obs)
+                actions.append(act)
+            total_inference_time += time.time() - start
+
+            # play regular actions
+            for act in actions:
+                num_actual_actions += 1
+                next_obs, r, done, _ = env.step(act)
+                if done:
+                    break
+
+            # compute reward
+            total_reward += r
+            success = env.is_success()["task"]
+
+            # visualization
+            if render:
+                env.render(mode="human", camera_name=camera_names[0])
+            if video_writer is not None:
+                if video_count % video_skip == 0:
+                    video_img = []
+                    for cam_name in camera_names:
+                        video_img.append(env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                    video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                    video_writer.append_data(video_img)
+                video_count += 1
+
+            # collect transition
+            traj["actions"].append(act)
+            traj["rewards"].append(r)
+            traj["dones"].append(done)
+            traj["states"].append(state_dict["states"])
+            if return_obs:
+                # Note: We need to "unprocess" the observations to prepare to write them to dataset.
+                #       This includes operations like channel swapping and float to uint8 conversion
+                #       for saving disk space.
+                traj["obs"].append(ObsUtils.unprocess_obs_dict(obs))
+                traj["next_obs"].append(ObsUtils.unprocess_obs_dict(next_obs))
+
+            # break if done or if success
+            if done or success:
+                break
+
+            # update for next iter
+            obs = deepcopy(next_obs)
+            state_dict = env.get_state()
+
+
+    except env.rollout_exceptions as e:
+        print("WARNING: got rollout exception {}".format(e))
+
+    total_time_taken = time.time() - start_rollout
+
+    stats = dict(Return=total_reward, Horizon=num_actual_actions, Success_Rate=float(success), Time_Taken_in_rollout= total_time_taken)
+
+    if return_obs:
+        # convert list of dict to dict of list for obs dictionaries (for convenient writes to hdf5 dataset)
+        traj["obs"] = TensorUtils.list_of_flat_dict_to_dict_of_list(traj["obs"])
+        traj["next_obs"] = TensorUtils.list_of_flat_dict_to_dict_of_list(traj["next_obs"])
+
+    # list to numpy array
+    for k in traj:
+        if k == "initial_state_dict":
+            continue
+        if isinstance(traj[k], dict):
+            for kp in traj[k]:
+                traj[k][kp] = np.array(traj[k][kp])
+        else:
+            traj[k] = np.array(traj[k])
+
+    return stats, traj
