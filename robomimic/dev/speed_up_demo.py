@@ -17,27 +17,10 @@ from robomimic.envs.env_base import EnvBase
 from robomimic.dev.dev_utils import aggregate_delta_actions, in_same_direction, aggregate_delta_actions_with_gripper_check
 from robomimic.dev.dev_utils import DELTA_ACTION_MAGNITUDE_LIMIT, SCALE_ACTION_LIMIT, REPEAT_LAST_ACTION_TIMES
 
-
-
 import nexusformat.nexus as nx
-
 
 ### END IMPORTS
 
-### Setup some constants
-
-
-
-GRIPPER_CHANGE_THRESHOLD = 0.3
-
-
-
-#
-# demo = nx.nxload(demo_fn)
-# print(demo.tree)
-
-
-### Read in demo file
 
 def complete_setup_for_replay(demo_fn):
     demo_file = h5py.File(demo_fn)
@@ -77,7 +60,6 @@ def complete_setup_for_replay(demo_fn):
 
     ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
     return env, demo_file
-
 
 def replay_by_aggregating(demo_fn, limit, aggregating_function=aggregate_delta_actions, video_fn=None):
     env, demo_file = complete_setup_for_replay(demo_fn)
@@ -306,7 +288,9 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
 
     ### Init env
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
-    joint_controller_fp = "robomimic/robosuite_configs/joint_position_nadun.json"
+    from robomimic.robosuite_configs.paths import joint_position as jp_path
+    joint_controller_fp = "/media/nadun/Data/phd_project/robomimic/robomimic/robosuite_configs/joint_position_nadun.json"
+    joint_controller_fp = jp_path()
     controller_configs = json.load(open(joint_controller_fp))
     env_meta["env_kwargs"]["controller_configs"] = controller_configs
 
@@ -339,11 +323,12 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
         env.reset_to(initial_state)
 
         actions = demo['obs/robot0_joint_pos'][:]  # action is [joint_pos, gripper] where dpos and drot are vectors of size 3
-        actions = demo['obs/robot0_joint_vel'][:]
+        # actions = demo['obs/robot0_joint_vel'][:]
         gripper_actions = demo['actions'][:,-1]
         gripper_actions = np.expand_dims(gripper_actions, axis=1)
 
         actions = np.concatenate([actions, gripper_actions], axis=1)
+        actions = demo["joint_position_actions"]
 
         start = time.time()
 
@@ -362,8 +347,8 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
 
             joint_pos_list.append(joint_pos)
 
-            act[:-1] = act[:-1] - joint_pos
-            act[:-1] *= 2
+            # act[:-1] = act[:-1] - joint_pos
+            # act[:-1] *= 2
 
             next_obs, _, _, _ = env.step(act)
 
@@ -385,7 +370,7 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
 if __name__ == "__main__":
     demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/square/ph/low_dim_v141.hdf5"
     ### execute functions
-    replay_joint_position_actions(demo_fn, 20, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_20.mp4")
+    replay_joint_position_actions(demo_fn, 2, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_2.mp4")
     # replay_by_aggregating(demo_fn, 100, aggregating_function=aggregate_delta_actions, video_fn="/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/aggregated_actions_4.mp4")
 
 
