@@ -22,6 +22,7 @@ JOINT_TO_NAME = {
 }
 
 ANGLE_MULTIPLIER = 1
+PLOT_SAMPLES = 5
 
 
 def ros_time_to_float(ros_time):
@@ -65,6 +66,7 @@ actual_actions = demo['actions']
 pred_actions = demo['pred_actions']
 obs_joint_pos = demo['obs_joint_pos']
 drop_actions = demo['drop_action_list']
+all_preds_list = demo['all_preds_list']
 
 
 ### CREATE THE DATA FOR actual actions
@@ -76,6 +78,11 @@ pred_y_list = []
 obs_x_list = []
 obs_y_list = []
 
+### DATA FOR THE MULTIPLE SAMPLING
+sampled_x_list_by_inference = []
+sampled_y_list_by_inference = []
+
+
 for i, time in enumerate(demo['traj_start_times']):
     time = ros_time_to_float(time)
     actual_x = []
@@ -85,12 +92,31 @@ for i, time in enumerate(demo['traj_start_times']):
 
     obs_x_list.append(time)
     obs_y_list.append(obs_joint_pos[i][PLOT_JOINT]* ANGLE_MULTIPLIER)
-    for j in range(16):
+    for j in range(pred_actions[i].shape[0]):
         pred_y.append(pred_actions[i][j, PLOT_JOINT] * ANGLE_MULTIPLIER)
         pred_x.append(time + (j + 1) * pt_time)
     for k in range(actual_actions[i].shape[0]):
         actual_x.append(time + (k + 1 + drop_actions[i]) * pt_time)
         actual_y.append(actual_actions[i][k, PLOT_JOINT] * ANGLE_MULTIPLIER)
+
+    all_preds = all_preds_list[i]
+
+    sampled_x_for_inference_step = []
+    sampled_y_for_inference_step = []
+
+    for m in range(PLOT_SAMPLES):
+        pred = all_preds[m]
+        sampled_y_list = []
+        sampled_x_list = []
+        for n in range(pred.shape[0]):
+            sampled_y_list.append(pred[n, PLOT_JOINT]*ANGLE_MULTIPLIER)
+            sampled_x_list.append(time + (n + 1) * pt_time)
+
+        sampled_x_for_inference_step.append(sampled_x_list)
+        sampled_y_for_inference_step.append(sampled_y_list)
+
+    sampled_x_list_by_inference.append(sampled_x_for_inference_step)
+    sampled_y_list_by_inference.append(sampled_y_for_inference_step)
 
     actual_x_list.append(actual_x)
     actual_y_list.append(actual_y)
@@ -100,8 +126,14 @@ for i, time in enumerate(demo['traj_start_times']):
 
 for i, X in enumerate(pred_x_list):
     plt.plot(obs_x_list[i], obs_y_list[i], label="joint state at time of prediction", ls='None', marker=f'${str(i)}$',
-             color='red', markersize=16)
+             color='red', markersize=18)
     plt.plot(X, pred_y_list[i], label="predictions", ls='None', marker=f'${str(i)}$', color="orange", markersize=14)
+
+    x_samples_list = sampled_x_list_by_inference[i]
+    y_samples_list = sampled_y_list_by_inference[i]
+    for k, X in enumerate(x_samples_list):
+        y_samples = y_samples_list[k]
+        plt.plot(X, y_samples, marker=f'${str(i)}$', markersize=10, ls='None', color="blue")
 
 #
 # for i, X in enumerate(actual_x_list):
