@@ -316,12 +316,13 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
     # TODO: MOVE THIS
     kwargs = {"return_action_sequence": True, "step_action_sequence": True,
               "control_mode": "Joint_Position_Trajectory", "delta_model": False,
-              "temporal_ensemble": True, "spline": True}
+              "temporal_ensemble": True, "spline": False, "inpaint_first_action": False,
+              "diffusion_sample_n": 10, "return_all_pred": True}
 
     env.robot_interface.switch_to_joint_traj_controller()
 
     action_sequence_length = policy.policy.algo_config.horizon.action_horizon
-    run_actions = 2
+    run_actions = 6
 
     prev_action = None
     last_time_sent_actions = time.time()
@@ -339,6 +340,7 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
     obs_joint_pos = []
     prev_actions_completed = []
     drop_action_list = []
+    all_preds_list = []
 
     if return_obs:
         # store observations too
@@ -359,9 +361,15 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
             start_inf = time.time()
             kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
 
-            act = policy(ob=obs, **kwargs) # Act will be sequence (N, act_dim)
+            if kwargs["inpaint_first_action"]:
+                curr_joint_pos = obs["joint_positions"]
+                curr_gripper = obs["gripper_state"]
+                kwargs["first_action"] = np.concatenate([curr_joint_pos, curr_gripper], axis=0)
+
+            act, all_pred = policy(ob=obs, **kwargs) # Act will be sequence (N, act_dim)
 
             traj["pred_actions"].append(act)
+            all_preds_list.append(all_pred)
 
             if run_actions >= act.shape[0]:
                 kwargs["inf_start_time"] = env.robot_interface.node.get_clock().now().to_msg()
@@ -563,6 +571,7 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
     traj['obs_joint_pos'] = obs_joint_pos
     traj['prev_actions_completed'] = prev_actions_completed
     traj['drop_action_list'] = drop_action_list
+    traj['all_preds_list'] = all_preds_list
 
 
     return stats, traj
@@ -961,9 +970,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/models/model_epoch_750.pth"
+    args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/speed_up_experiments/pick_sube/pick_cube_joint_actions_with_gripper/20240828223719/models/model_epoch_1000.pth"
 
-    args.dataset_path = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_spline_3x_speed_run_2.pkl"
+    args.dataset_path = "/home/robot-aiml/ac_learning_repos/experiment_logs/pick_cube_gripper/blended_actions_1x_sample_multiple.pkl"
 
     run_trained_agent(args)
     #

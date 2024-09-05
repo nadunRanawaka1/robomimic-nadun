@@ -38,11 +38,8 @@ log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/r
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_blended_actions_traj_replacement_half_speed_drop_action.pkl"
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_half_speed.pkl"
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_2x_speed.pkl"
-log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_spline_2x_speed.pkl"
-log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_spline_2x_speed_image_only.pkl"
-log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_spline_0.25_speed.pkl"
-log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_spline_2x_speed_run_2.pkl"
-log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_spline_3x_speed_run_2.pkl"
+
+log_fn = "/home/robot-aiml/ac_learning_repos/experiment_logs/pick_cube_gripper/blended_actions_1x_sample_multiple.pkl"
 
 with open(log_fn, "rb") as f:
     log = pickle.load(f)
@@ -107,8 +104,8 @@ for i, X in enumerate(pred_x_list):
     plt.plot(X, pred_y_list[i], label="predictions", ls='None', marker=f'${str(i)}$', color="orange", markersize=14)
 
 #
-for i, X in enumerate(actual_x_list):
-    plt.plot(X, actual_y_list[i], label="blended actions", ls="None", marker=f'${str(i)}$', markersize=10, color="green")
+# for i, X in enumerate(actual_x_list):
+#     plt.plot(X, actual_y_list[i], label="blended actions", ls="None", marker=f'${str(i)}$', markersize=10, color="green")
 
 
 
@@ -125,7 +122,7 @@ for msg in joint_msgs:
     j_msg_y.append(msg.position[ind] * ANGLE_MULTIPLIER)
 
 ### PLOT THE ACTUAL JOINT STATE
-plt.plot(j_msg_X, j_msg_y, color="blue", label="actual joint positions")
+# plt.plot(j_msg_X, j_msg_y, color="blue", label="actual joint positions")
 
 print()
 
@@ -145,8 +142,8 @@ for msg in traj_msgs:
     msg_y_list.append(msg_y)
 
 ### PLOT THE ACTUAL MSGS
-for i, X in enumerate(msg_X_list):
-    plt.plot(X, msg_y_list[i], color="purple", label="published traj msgs", marker="*", ls="None")
+# for i, X in enumerate(msg_X_list):
+#     plt.plot(X, msg_y_list[i], color="purple", label="published traj msgs", marker="*", ls="None")
 
 #### PLOTTING WITH TRAJ REPLACEMENT
 
