@@ -518,7 +518,6 @@ def run_trained_agent(args, **kwargs):
     if args.control_freq is not None:
         ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
 
-
     # TODO setting some scaling things here
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = - kwargs["delta_action_magnitude_limit"]
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = kwargs["delta_action_magnitude_limit"]
@@ -720,7 +719,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=100,
+        default=5,
         help="number of rollouts",
     )
 
