@@ -267,6 +267,8 @@ class EnvRobosuite(EB.EnvBase):
             ret["eef_pos"] = np.array(di["eef_pos"])
             ret["eef_quat"] = np.array(di["eef_quat"])
             ret["gripper_qpos"] = np.array(di["gripper_qpos"])
+        
+        ret["cur_time"] = np.array(di["cur_time"])
         return ret
 
     def get_real_depth_map(self, depth_map):

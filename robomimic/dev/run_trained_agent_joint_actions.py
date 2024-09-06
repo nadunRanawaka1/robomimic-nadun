@@ -216,6 +216,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     total_inference_time = 0
     num_actual_actions = 0
+    sim_time = 0
 
     start_rollout = time.time()
 
@@ -232,7 +233,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
 
             # play action
 
-            # TODO this does not work yet
+            # TODO wip
             if kw_args['return_action_sequence']:
                 if kw_args['aggregate_actions']:
                     # Play aggregated actions
@@ -318,8 +319,10 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                 traj["obs"].append(ObsUtils.unprocess_obs_dict(obs))
                 traj["next_obs"].append(ObsUtils.unprocess_obs_dict(next_obs))
 
+            sim_time = next_obs['cur_time'][-1][-1]
             # break if done or if success
             if done or success:
+                # print(f"total sim time: {next_obs['cur_time']}")
                 break
 
             # update for next iter
@@ -330,7 +333,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
     except env.rollout_exceptions as e:
         print("WARNING: got rollout exception {}".format(e))
 
-    stats = dict(Return=total_reward, Horizon=num_actual_actions, Success_Rate=float(success), Time_Taken_in_rollout = time.time() - start_rollout)
+    stats = dict(Return=total_reward, Horizon=num_actual_actions, Success_Rate=float(success), Time_taken_in_rollout = time.time() - start_rollout, Time_taken_in_sim = sim_time)
 
     if return_obs:
         # convert list of dict to dict of list for obs dictionaries (for convenient writes to hdf5 dataset)
@@ -514,13 +517,19 @@ def run_trained_agent(args):
     # TODO setting control freq here
     if args.control_freq is not None:
         ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
-    print()
 
-    joint_controller_fp = "robomimic/robosuite_configs/joint_trajectory.json"
+    if args.trajectory_steps > 1 and args.trajectory_timestep > 0.0:
+        ckpt_dict["env_metadata"]["env_kwargs"]["trajectory_steps"] = args.trajectory_steps
+        ckpt_dict["env_metadata"]["env_kwargs"]["trajectory_timestep"] = args.trajectory_timestep
+        ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = 1/(args.trajectory_steps * args.trajectory_timestep)
+
+    # joint_controller_fp = "robomimic/robosuite_configs/joint_position.json"
+    joint_controller_fp = args.controller_config_path
     # joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
     controller_configs = json.load(open(joint_controller_fp))
-
+    assert args.trajectory_timestep == controller_configs["trajectory_timestep"]
     ckpt_dict["env_metadata"]["env_kwargs"]["controller_configs"] = controller_configs
+
     # TODO setting some scaling things here
     # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
     # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
@@ -528,7 +537,7 @@ def run_trained_agent(args):
     # ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
 
     # TODO setting kw_args for rollout here
-    kw_args = {"return_action_sequence": True, "aggregate_actions": False}
+    kw_args = {"return_action_sequence": args.return_action_sequence, "aggregate_actions": False}
 
     # read rollout settings
     rollout_num_episodes = args.n_rollouts
@@ -610,6 +619,9 @@ def run_trained_agent(args):
     avg_rollout_stats = { k : np.mean(rollout_stats[k]) for k in rollout_stats }
     avg_rollout_stats["Num_Success"] = np.sum(rollout_stats["Success_Rate"])
     avg_rollout_stats[f"Time for {rollout_num_episodes} demos"] = time.time() - start
+    success_mask = np.array(rollout_stats["Success_Rate"]).astype(bool)
+    success_sim_time = np.array(rollout_stats["Time_taken_in_sim"])[success_mask]
+    avg_rollout_stats["Time_taken_in_success_sim"] = np.mean(success_sim_time)
 
     print("Average Rollout Stats")
     print(json.dumps(avg_rollout_stats, indent=4))
@@ -637,7 +649,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/square_image_diffusion_policy_joint_actions/20240903144531/models/model_epoch_600.pth",
+        default="bc_trained_models/diffusion_policy/can_image_diffusion_policy_joint_actions/20240904041148/models/model_epoch_600.pth",
         # default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/lift_image_diffusion_policy_joint_actions/20240903151034/models/model_epoch_600.pth",
         required=False,
         help="path to saved checkpoint pth file",
@@ -647,7 +659,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=1,
+        default=2,
         help="number of rollouts",
     )
 
@@ -655,7 +667,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--horizon",
         type=int,
-        default=None,
+        default=100,
         help="(optional) override maximum horizon of rollout from the one in the checkpoint",
     )
 
@@ -679,9 +691,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--video_path",
         type=str,
-        # default="bc_trained_models/diffusion_policy/lift_image_diffusion_policy_joint_actions/20240903151034/videos/custom_config_rollout.mp4",
+        default="bc_trained_models/diffusion_policy/can_image_diffusion_policy_joint_actions/20240904041148/videos/can_joint_traj_rollout_timestep_0.025.mp4",
         # default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/square_image_diffusion_policy_joint_actions/20240903144531/videos/custom_config_rollout.mp4",
-        default=None,
+        # default=None,
         help="(optional) render rollouts to this video file path",
     )
 
@@ -706,14 +718,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_path",
         type=str,
-        default=None,
+        default="bc_trained_models/diffusion_policy/can_image_diffusion_policy_joint_actions/20240904041148/rollout_obs/can_joint_traj_timestep_0.025.hdf5",
         help="(optional) if provided, an hdf5 file will be written at this path with the rollout data",
     )
 
     # If True and @dataset_path is supplied, will write possibly high-dimensional observations to dataset.
     parser.add_argument(
         "--dataset_obs",
-        action='store_true',
+        action='store_false',
         help="include possibly high-dimensional observations in output dataset hdf5 file (by default,\
             observations are excluded and only simulator states are saved)",
     )
@@ -729,7 +741,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--control_freq",
         type=int,
-        default=2.5,
+        default=20,
         help="how fast to run robot",
     )
     parser.add_argument(
@@ -741,14 +753,41 @@ if __name__ == "__main__":
     parser.add_argument(
         '--rollout_stats_path',
         type=str,
-        default=None,
+        default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/can_image_diffusion_policy_joint_actions/20240904041148/rollout_stats/can_joint_traj_timestep_0.025.xlsx",
         help="Where to save the rollout stats to, as a pandas dataframe"
     )
 
+    parser.add_argument(
+        "--trajectory_steps",
+        type=int,
+        default=8,
+        help="number of points in the trajectory"
+    )
+
+    parser.add_argument(
+        "--trajectory_timestep",
+        type=float,
+        default=0.025,
+        help="time duration between each point in the trajectory"
+    )
+
+    parser.add_argument(
+        "--controller_config_path",
+        type=str,
+        default="robomimic/robosuite_configs/joint_trajectory.json",
+        # default="robomimic/robosuite_configs/joint_position.json",
+        help="config file path for controller"
+    )
+
+    parser.add_argument(
+        "--return_action_sequence",
+        action="store_false",
+        help="use joint trajectory prediction"
+    )
 
     args = parser.parse_args()
     # args.evaluate_control_freqs = True
-    args.render = True
+    # args.render = True
 
     run_trained_agent(args)
 

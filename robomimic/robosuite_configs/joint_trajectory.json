@@ -13,5 +13,5 @@
     "interpolation": null,
     "ramp_ratio": 0.2,
     "trajectory_steps": 8,
-    "trajectory_timestep": 0.05
+    "trajectory_timestep": 0.025
   }

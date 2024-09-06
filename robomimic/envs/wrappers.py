@@ -201,11 +201,11 @@ class FrameStackWrapper(EnvWrapper):
             info (dict): extra information
         """
         obs, r, done, info = self.env.step(action)
-        if len(obs) > 1:
+        if type(obs) is list:
             for i in range(len(obs)):
                 self.update_obs(obs[i], action=action, reset=False)
         # update frame history
-        if len(obs) > 1:
+        if type(obs) is list:
             for i in range(len(obs)):
                 for k in obs[i]:
                     # make sure to have leading dim of 1 for easy concatenation
