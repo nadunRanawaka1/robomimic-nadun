@@ -1,7 +1,7 @@
 {
-    "algo_name": "act",
+    "algo_name": "bc",
     "experiment": {
-        "name": "pick_cube_act_joint_positions_seq_50_image_fix",
+        "name": "pick_cube_transformer",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -9,7 +9,6 @@
             "log_wandb": false,
             "wandb_proj_name": "debug"
         },
-        "mse":{},
         "save": {
             "enabled": true,
             "every_n_seconds": null,
@@ -19,7 +18,7 @@
             "on_best_rollout_return": false,
             "on_best_rollout_success_rate": true
         },
-        "epoch_every_n_steps": 500,
+        "epoch_every_n_steps": 100,
         "validation_epoch_every_n_steps": 10,
         "env": null,
         "additional_envs": null,
@@ -31,23 +30,23 @@
             "enabled": false,
             "n": 50,
             "horizon": 400,
-            "rate": 40,
+            "rate": 50,
             "warmstart": 0,
             "terminate_on_success": true
         }
     },
     "train": {
         "data": "/nethome/nkra3/flash7/ATRP_AC_Learning/datasets/speed_up_demos/demo_pick_cube_realsense.hdf5",
-        "output_dir": "../bc_trained_models/act/real_robot/pick_cube_realsense",
+        "output_dir": "../bc_trained_models/transformer/real_robot/pick_cube_realsense",
         "num_data_workers": 4,
         "hdf5_cache_mode": "low_dim",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": false,
         "hdf5_normalize_obs": false,
         "hdf5_filter_key": null,
-        "seq_length": 50,
+        "seq_length": 1,
         "pad_seq_length": true,
-        "frame_stack": 1,
+        "frame_stack": 10,
         "pad_frame_stack": true,
         "dataset_keys": [
             "joint_position_actions",
@@ -84,32 +83,44 @@
             "policy": {
                 "optimizer_type": "adamw",
                 "learning_rate": {
-                    "initial": 0.00005,
-                    "decay_factor": 1,
-                    "epoch_schedule": [
-                        100
-                    ],
+                    "initial": 0.0001,
+                    "decay_factor": 0.1,
+                    "epoch_schedule": [100],
                     "scheduler_type": "linear"
                 },
                 "regularization": {
-                    "L2": 0.0001
+                    "L2": 0.01
                 }
             }
         },
         "loss": {
-            "l2_weight": 0.0,
-            "l1_weight": 1.0,
+            "l2_weight": 1.0,
+            "l1_weight": 0.0,
             "cos_weight": 0.0
         },
-        "act": {
-            "hidden_dim": 512,
-            "dim_feedforward": 3200,
-            "backbone": "resnet18",
-            "enc_layers": 4,
-            "dec_layers": 7,
-            "nheads": 8,
-            "latent_dim": 32,
-            "kl_weight": 20
+        "actor_layer_dims": [],
+        "gaussian": {
+            "enabled": false
+        },
+        "gmm": {
+            "enabled": true,
+            "num_modes": 5,
+            "min_std": 0.0001,
+            "std_activation": "softplus",
+            "low_noise_eval": true
+        },
+        "vae": {
+            "enabled": false
+        },
+        "rnn": {
+            "enabled": false
+        },
+        "transformer": {
+            "enabled": true,
+            "supervise_all_steps": false,
+            "num_layers": 6,
+            "embed_dim": 512,
+            "num_heads": 8
         }
     },
     "observation": {
