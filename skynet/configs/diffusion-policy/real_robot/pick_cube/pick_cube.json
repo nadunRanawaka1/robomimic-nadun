@@ -36,10 +36,10 @@
         }
     },
     "train": {
-        "data": "/nethome/nkra3/flash7/ATRP_AC_Learning/datasets/speed_up_demos/demo_pick_cube_realsense.hdf5",
+        "data": "/home/robot-aiml/ac_learning_repos/Task_Demos/merged/move_to_skynet/demo_pick_cube_realsense.hdf5",
         "output_dir": "../bc_trained_models/diffusion_policy/real_robot/pick_cube_realsense",
         "num_data_workers": 2,
-        "hdf5_cache_mode": "all",
+        "hdf5_cache_mode": "low_dim",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": false,
         "hdf5_normalize_obs": false,
