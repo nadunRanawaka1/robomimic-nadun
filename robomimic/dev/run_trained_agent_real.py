@@ -166,10 +166,10 @@ def rollout(
             start = time.time()
             if rollout_demo_obs:
                 obs = demo_obs_to_obs_dict(demo['obs'], step_i)
-            else:
-                obs = env.get_observation()
+                obs = env.get_observation(obs)
+
             # get action from policy
-            act = policy(ob=obs, **kw_args)
+            act = policy(ob=obs, **kwargs)
             np.set_printoptions(precision=8)
             print("Run_Trained_Agent_real: action from policy is: {}".format(act))
 
@@ -317,7 +317,7 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
     kwargs = {"return_action_sequence": True, "step_action_sequence": True,
               "control_mode": "Joint_Position_Trajectory", "delta_model": False,
               "temporal_ensemble": True, "spline": False, "inpaint_first_action": False,
-              "diffusion_sample_n": 10, "return_all_pred": True}
+              "diffusion_sample_n": 1, "return_all_pred": False}
 
     env.robot_interface.switch_to_joint_traj_controller()
 
@@ -366,7 +366,11 @@ def rollout_with_action_sequence(policy, env, horizon, render=False, video_write
                 curr_gripper = obs["gripper_state"]
                 kwargs["first_action"] = np.concatenate([curr_joint_pos, curr_gripper], axis=0)
 
-            act, all_pred = policy(ob=obs, **kwargs) # Act will be sequence (N, act_dim)
+            if kwargs["return_all_pred"]:
+                act, all_pred = policy(ob=obs, **kwargs) # Act will be sequence (N, act_dim)
+            else:
+                act = policy(ob=obs, **kwargs)
+                all_pred = None
 
             traj["pred_actions"].append(act)
             all_preds_list.append(all_pred)
@@ -648,20 +652,7 @@ def run_trained_agent(args):
     for i in range(rollout_num_episodes):
         try:
             # TODO ### ROLLING OUT NORMALLY
-            # stats, traj = rollout(
-            #     policy=policy,
-            #     env=env,
-            #     horizon=rollout_horizon,
-            #     render=args.render,
-            #     video_writer=video_writer,
-            #     video_skip=args.video_skip,
-            #     return_obs=(write_dataset and args.dataset_obs),
-            #     camera_names=args.camera_names,
-            #     real=is_real_robot,
-            # )
-
-            # TODO ROLLING OUT AS A SEQUENCE
-            stats, traj = rollout_with_action_sequence(
+            stats, traj = rollout(
                 policy=policy,
                 env=env,
                 horizon=rollout_horizon,
@@ -672,6 +663,19 @@ def run_trained_agent(args):
                 camera_names=args.camera_names,
                 real=is_real_robot,
             )
+
+            # TODO ROLLING OUT AS A SEQUENCE
+            # stats, traj = rollout_with_action_sequence(
+            #     policy=policy,
+            #     env=env,
+            #     horizon=rollout_horizon,
+            #     render=args.render,
+            #     video_writer=video_writer,
+            #     video_skip=args.video_skip,
+            #     return_obs=(write_dataset and args.dataset_obs),
+            #     camera_names=args.camera_names,
+            #     real=is_real_robot,
+            # )
         except KeyboardInterrupt:
             if is_real_robot:
                 print("ctrl-C catched, stop execution")
@@ -970,9 +974,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/speed_up_experiments/pick_sube/pick_cube_joint_actions_with_gripper/20240828223719/models/model_epoch_1000.pth"
+    # args.agent= "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/speed_up_experiments/pick_sube/pick_cube_joint_actions_with_gripper/20240828223719/models/model_epoch_1000.pth"
+    args.agent = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/speed_up_experiments/pick_cube_realsense/pick_cube_ee_control_framestack_2/20240905232039/models/model_epoch_1200.pth"
 
-    args.dataset_path = "/home/robot-aiml/ac_learning_repos/experiment_logs/pick_cube_gripper/blended_actions_1x_sample_multiple.pkl"
+
+    # args.dataset_path = "/home/robot-aiml/ac_learning_repos/experiment_logs/pick_cube_realsense/joint_pos_no_framestack_3_cams/blended_actions_1x.pkl"
 
     run_trained_agent(args)
     #

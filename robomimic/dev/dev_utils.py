@@ -1,5 +1,8 @@
 import numpy as np
 from copy import deepcopy
+import robomimic.utils.obs_utils as ObsUtils
+
+
 ### Setup some constants
 # TODO: find best way to handle these constants
 DELTA_ACTION_MAGNITUDE_LIMIT = 4.0
@@ -12,6 +15,16 @@ GRIPPER_VELOCITY_THRESHOLD = 0.5
 GRIPPER_COMMAND_CHANGE_THRESHOLD = 0.2
 
 REPEAT_LAST_ACTION_TIMES = 10
+
+
+def postprocess_obs(obs):
+    for key in obs:
+        if "image" in key or "rgb" in key and "time" not in key:
+            obs[key] = ObsUtils.process_obs(obs[key], obs_modality="rgb")
+        if "depth" in key and "time" not in key:
+            obs[key] = ObsUtils.process_obs(obs[key], obs_modality="depth")
+    return obs
+
 
 def demo_obs_to_obs_dict(demo_obs, ind):
     obs_dict = {}

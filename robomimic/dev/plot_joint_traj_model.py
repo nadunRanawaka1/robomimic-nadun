@@ -23,6 +23,7 @@ JOINT_TO_NAME = {
 
 ANGLE_MULTIPLIER = 1
 PLOT_SAMPLES = 5
+Y_LIM = (-1.90*ANGLE_MULTIPLIER, -1.10*ANGLE_MULTIPLIER)
 
 
 def ros_time_to_float(ros_time):
@@ -40,7 +41,8 @@ log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/r
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_half_speed.pkl"
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_2x_speed.pkl"
 
-log_fn = "/home/robot-aiml/ac_learning_repos/experiment_logs/pick_cube_gripper/blended_actions_1x_sample_multiple.pkl"
+
+log_fn = "/home/robot-aiml/ac_learning_repos/experiment_logs/pick_cube_realsense/joint_pos_no_framestack_3_cams/blended_actions_1x.pkl"
 
 with open(log_fn, "rb") as f:
     log = pickle.load(f)
@@ -99,24 +101,24 @@ for i, time in enumerate(demo['traj_start_times']):
         actual_x.append(time + (k + 1 + drop_actions[i]) * pt_time)
         actual_y.append(actual_actions[i][k, PLOT_JOINT] * ANGLE_MULTIPLIER)
 
-    all_preds = all_preds_list[i]
-
-    sampled_x_for_inference_step = []
-    sampled_y_for_inference_step = []
-
-    for m in range(PLOT_SAMPLES):
-        pred = all_preds[m]
-        sampled_y_list = []
-        sampled_x_list = []
-        for n in range(pred.shape[0]):
-            sampled_y_list.append(pred[n, PLOT_JOINT]*ANGLE_MULTIPLIER)
-            sampled_x_list.append(time + (n + 1) * pt_time)
-
-        sampled_x_for_inference_step.append(sampled_x_list)
-        sampled_y_for_inference_step.append(sampled_y_list)
-
-    sampled_x_list_by_inference.append(sampled_x_for_inference_step)
-    sampled_y_list_by_inference.append(sampled_y_for_inference_step)
+    # all_preds = all_preds_list[i]
+    #
+    # sampled_x_for_inference_step = []
+    # sampled_y_for_inference_step = []
+    #
+    # for m in range(PLOT_SAMPLES):
+    #     pred = all_preds[m]
+    #     sampled_y_list = []
+    #     sampled_x_list = []
+    #     for n in range(pred.shape[0]):
+    #         sampled_y_list.append(pred[n, PLOT_JOINT]*ANGLE_MULTIPLIER)
+    #         sampled_x_list.append(time + (n + 1) * pt_time)
+    #
+    #     sampled_x_for_inference_step.append(sampled_x_list)
+    #     sampled_y_for_inference_step.append(sampled_y_list)
+    #
+    # sampled_x_list_by_inference.append(sampled_x_for_inference_step)
+    # sampled_y_list_by_inference.append(sampled_y_for_inference_step)
 
     actual_x_list.append(actual_x)
     actual_y_list.append(actual_y)
@@ -129,11 +131,13 @@ for i, X in enumerate(pred_x_list):
              color='red', markersize=18)
     plt.plot(X, pred_y_list[i], label="predictions", ls='None', marker=f'${str(i)}$', color="orange", markersize=14)
 
-    x_samples_list = sampled_x_list_by_inference[i]
-    y_samples_list = sampled_y_list_by_inference[i]
-    for k, X in enumerate(x_samples_list):
-        y_samples = y_samples_list[k]
-        plt.plot(X, y_samples, marker=f'${str(i)}$', markersize=10, ls='None', color="blue")
+
+    # Plotting the multiple samples
+    # x_samples_list = sampled_x_list_by_inference[i]
+    # y_samples_list = sampled_y_list_by_inference[i]
+    # for k, X in enumerate(x_samples_list):
+    #     y_samples = y_samples_list[k]
+    #     plt.plot(X, y_samples, marker=f'${str(i)}$', markersize=10, ls='None', color="blue")
 
 #
 # for i, X in enumerate(actual_x_list):
@@ -153,8 +157,8 @@ for msg in joint_msgs:
     j_msg_X.append(ros_time_to_float(msg.header.stamp))
     j_msg_y.append(msg.position[ind] * ANGLE_MULTIPLIER)
 
-### PLOT THE ACTUAL JOINT STATE
-# plt.plot(j_msg_X, j_msg_y, color="blue", label="actual joint positions")
+## PLOT THE ACTUAL JOINT STATE
+plt.plot(j_msg_X, j_msg_y, color="blue", label="actual joint positions")
 
 print()
 
@@ -177,61 +181,9 @@ for msg in traj_msgs:
 # for i, X in enumerate(msg_X_list):
 #     plt.plot(X, msg_y_list[i], color="purple", label="published traj msgs", marker="*", ls="None")
 
-#### PLOTTING WITH TRAJ REPLACEMENT
-
-# preds = demo['actions'][:]
-# timestep  = 0
-# replace_every = 8
-# x_list = []
-# y_list = []
-# for i in range(preds.shape[0]):
-#     traj =preds[i]
-#     y = []
-#     x = []
-#     for j in range(replace_every):
-#         y.append(traj[j, 0])
-#         x.append(timestep)
-#         timestep += 1
-#     x_list.append(x)
-#     y_list.append(y)
-#
-# color = iter(cm.rainbow(np.linspace(0, 1, len(y_list))))
-# for i, traj in enumerate(y_list):
-#     # c = next(color)
-#     plt.plot(x_list[i], traj)
-#
-# plt.ylabel("Joint command (rads)")
-# plt.xlabel("Timestep")
-# plt.show()
-# print()
 
 
 
-### Traj Replacement + Smoothing
-
-# preds = demo['actions'][:]
-# timestep  = 0
-# replace_every = 8
-# x_list = []
-# y_list = []
-# for i in range(preds.shape[0]):
-#     traj =preds[i]
-#     y = []
-#     x = []
-#     for j in range(replace_every):
-#         if j < 3:
-#             continue
-#         y.append(traj[j, 0])
-#         x.append(timestep)
-#         timestep += 1
-#     x_list.append(x)
-#     y_list.append(y)
-#
-# color = iter(cm.rainbow(np.linspace(0, 1, len(y_list))))
-# for i, traj in enumerate(y_list):
-#     # c = next(color)
-#     plt.plot(x_list[i], traj)
-#
 plt.ylabel("Joint Position")
 plt.xlabel("Timestep")
 # plt.legend()
@@ -243,6 +195,7 @@ handles, labels = plt.gca().get_legend_handles_labels()
 by_label = dict(zip(labels, handles))
 # Create the legend with unique labels
 plt.legend(by_label.values(), by_label.keys())
+plt.ylim(Y_LIM)
 plt.show()
 print()
 
