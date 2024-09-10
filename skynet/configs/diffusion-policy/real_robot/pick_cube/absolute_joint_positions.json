@@ -1,7 +1,7 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "ee_control_framestack_2_wrist_cam",
+        "name": "absolute_joint_control_framestack_2_wrist_cam",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -48,11 +48,11 @@
         "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
-            "absolute_axis_angle_actions",
+            "joint_position_actions",
             "rewards",
             "dones"
         ],
-        "action_keys": ["absolute_axis_angle_actions"],
+        "action_keys": ["joint_position_actions"],
         "action_config": {
             "delta_axis_angle_actions": {
                 "normalization": "min_max"
@@ -129,7 +129,7 @@
         "modalities": {
             "obs": {
                 "low_dim": [
-                    "ee_pose",
+                    "joint_positions",
                     "gripper_pos"
                 ],
                 "rgb": [
