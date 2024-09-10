@@ -528,6 +528,7 @@ def run_trained_agent(args):
     # joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
     controller_configs = json.load(open(joint_controller_fp))
     assert args.trajectory_timestep == controller_configs["trajectory_timestep"]
+    controller_configs["filename"] = args.controller_records_file_path
     ckpt_dict["env_metadata"]["env_kwargs"]["controller_configs"] = controller_configs
 
     # TODO setting some scaling things here
@@ -644,12 +645,13 @@ def run_trained_agent(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-
+    base_path = "bc_trained_models/diffusion_policy/can_image_diffusion_policy_joint_actions/20240904041148/"
+    trajectory_timestep = 0.05
     # Path to trained model
     parser.add_argument(
         "--agent",
         type=str,
-        default="bc_trained_models/diffusion_policy/can_image_diffusion_policy_joint_actions/20240904041148/models/model_epoch_600.pth",
+        default=base_path + "models/model_epoch_600.pth",
         # default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/lift_image_diffusion_policy_joint_actions/20240903151034/models/model_epoch_600.pth",
         required=False,
         help="path to saved checkpoint pth file",
@@ -659,7 +661,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=2,
+        default=1,
         help="number of rollouts",
     )
 
@@ -691,7 +693,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--video_path",
         type=str,
-        default="bc_trained_models/diffusion_policy/can_image_diffusion_policy_joint_actions/20240904041148/videos/can_joint_traj_rollout_timestep_0.025.mp4",
+        default=base_path + f"videos/joint_traj_rollout_timestep_{trajectory_timestep}.mp4",
         # default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/square_image_diffusion_policy_joint_actions/20240903144531/videos/custom_config_rollout.mp4",
         # default=None,
         help="(optional) render rollouts to this video file path",
@@ -718,7 +720,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_path",
         type=str,
-        default="bc_trained_models/diffusion_policy/can_image_diffusion_policy_joint_actions/20240904041148/rollout_obs/can_joint_traj_timestep_0.025.hdf5",
+        default=base_path + f"rollout_obs/joint_traj_timestep_{trajectory_timestep}.hdf5",
         help="(optional) if provided, an hdf5 file will be written at this path with the rollout data",
     )
 
@@ -753,7 +755,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--rollout_stats_path',
         type=str,
-        default="/home/robot_sim/acl_repos/robomimic-nadun/bc_trained_models/diffusion_policy/can_image_diffusion_policy_joint_actions/20240904041148/rollout_stats/can_joint_traj_timestep_0.025.xlsx",
+        default=base_path + f"rollout_stats/joint_traj_timestep_{trajectory_timestep}.xlsx",
         help="Where to save the rollout stats to, as a pandas dataframe"
     )
 
@@ -767,14 +769,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--trajectory_timestep",
         type=float,
-        default=0.025,
+        default=trajectory_timestep,
         help="time duration between each point in the trajectory"
     )
 
     parser.add_argument(
         "--controller_config_path",
         type=str,
-        default="robomimic/robosuite_configs/joint_trajectory.json",
+        default="robomimic/robosuite_configs/joint_trajectory_wrapper.json",
         # default="robomimic/robosuite_configs/joint_position.json",
         help="config file path for controller"
     )
@@ -783,6 +785,12 @@ if __name__ == "__main__":
         "--return_action_sequence",
         action="store_false",
         help="use joint trajectory prediction"
+    )
+
+    parser.add_argument(
+        "--controller_records_file_path",
+        type=str,
+        default=base_path + f"rollout_obs/joint_traj_controller_records_{trajectory_timestep}.hdf5"
     )
 
     args = parser.parse_args()

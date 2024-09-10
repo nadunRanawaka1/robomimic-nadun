@@ -1,11 +1,11 @@
 {
-    "type": "JOINT_TRAJECTORY",
+    "type": "JOINT_TRAJECTORY_WRAPPER",
     "input_max": 1,
     "input_min": -1,
     "output_max": 1.0,
     "output_min": -1.0,
-    "kp": 200,
-    "damping_ratio": 0.1,
+    "kp": 50,
+    "damping_ratio": 0.2,
     "impedance_mode": "fixed",
     "kp_limits": [0, 500],
     "damping_ratio_limits": [0, 10],
@@ -13,5 +13,6 @@
     "interpolation": null,
     "ramp_ratio": 0.2,
     "trajectory_steps": 8,
-    "trajectory_timestep": 0.025
+    "trajectory_timestep": 0.05,
+    "filename": "joint_trajectory_records"
   }
