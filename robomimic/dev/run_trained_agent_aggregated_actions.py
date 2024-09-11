@@ -59,6 +59,7 @@ import numpy as np
 from copy import deepcopy
 import time
 import os
+import datetime
 
 import torch
 
@@ -524,6 +525,7 @@ def run_trained_agent(args, **kwargs):
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] =  [kwargs["scale_action_limit"] * -1 for i in range(3)] + [kwargs["scale_action_limit"] * -10 for i in range(3)]
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = [kwargs["scale_action_limit"] * 1 for i in range(3)] + [kwargs["scale_action_limit"] * 10 for i in range(3)]
     ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['kp'] = kwargs["kp"]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['control_delta'] = kwargs.get("control_delta", True)
 
     # read rollout settings
     rollout_num_episodes = args.n_rollouts
@@ -684,20 +686,33 @@ def evaluate_aggregated_actions(args):
         df.to_excel(args.rollout_stats_path)
 
 
-def evaluate_over_control_freqs(args, start_range=10, end_range=200, step=2, success_threshold = 0.05):
+def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, success_threshold = 0.05):
 
     eval_data = defaultdict(list)
     counter = 0
+
+    today = datetime.date.today()
+    control_freq_eval_save_path = os.path.abspath(
+        os.path.join(args.agent, '..', '..', f'logs/control_freq_eval_{today}.xlsx'))
+    print(f"Saving stats to: {control_freq_eval_save_path}")
+
+
+
+    kwargs = {"return_action_sequence": True, "aggregate_actions": False, "delta_action_direction_threshold": 0.25,
+              "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
+              "delta_action_magnitude_limit": 1.0, "kp": 150, "control_delta": False}
+
     for freq in range(start_range, end_range, step):
 
         eval_data["control_freq"].append(freq)
         args.control_freq = freq
-        rollout_stats = run_trained_agent(args)
+        args.video_path = f"{args.video_dir}/rollout_freq_{freq}.mp4"
+        avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
         for stat in rollout_stats:
             eval_data[stat].append(rollout_stats[stat])
 
+
     df = pd.DataFrame(eval_data)
-    control_freq_eval_save_path = os.path.abspath(os.path.join(args.agent, '..', '..', 'logs/control_freq_eval.xlsx'))
     df.to_excel(control_freq_eval_save_path)
 
 
@@ -709,7 +724,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/lift_image_diffusion_policy/20240609000333/models/model_epoch_600.pth",
+        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/can_image/20240910154451/models/model_epoch_500.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )
@@ -719,7 +734,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=5,
+        default=100,
         help="number of rollouts",
     )
 
@@ -829,7 +844,9 @@ if __name__ == "__main__":
         args.video_dir = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'videos'))
 
     if args.rollout_stats_path is None:
-        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'aggregated_eval.xlsx'))
+        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs',
+                                                               f'eval{datetime.datetime.now()}.xlsx'))
 
-    evaluate_aggregated_actions(args)
+    # evaluate_aggregated_actions(args)
+    evaluate_over_control_freqs(args)
 
