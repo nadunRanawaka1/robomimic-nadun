@@ -6,11 +6,15 @@ import robomimic.utils.obs_utils as ObsUtils
 from robomimic.envs.env_base import EnvBase
 from robomimic.envs.wrappers import EnvWrapper
 from robomimic.algo import RolloutPolicy
+from scipy.spatial.transform import Rotation
+import h5py
+import robomimic.utils.file_utils as FileUtils
+import robomimic.utils.env_utils as EnvUtils
 
 
 ### Setup some constants
 # TODO: find best way to handle these constants
-DELTA_ACTION_MAGNITUDE_LIMIT = 4.0
+DELTA_ACTION_MAGNITUDE_LIMIT = 1.0
 DELTA_EPSILON = np.array([1e-7, 1e-7, 1e-7])
 DELTA_ACTION_DIRECTION_THRESHOLD = 0.25
 
@@ -21,6 +25,46 @@ GRIPPER_COMMAND_CHANGE_THRESHOLD = 0.2
 
 REPEAT_LAST_ACTION_TIMES = 10
 
+
+def complete_setup_for_replay(demo_fn, env_meta = None):
+    demo_file = h5py.File(demo_fn)
+
+    ### Init env
+    if env_meta is None:
+        env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
+
+        ### Resetting controller max control input and output here
+        env_meta['env_kwargs']['controller_configs']['input_min'] = -DELTA_ACTION_MAGNITUDE_LIMIT
+        env_meta['env_kwargs']['controller_configs']['input_max'] = DELTA_ACTION_MAGNITUDE_LIMIT
+
+        env_meta['env_kwargs']['controller_configs']['output_min'] = [-x for x in SCALE_ACTION_LIMIT]
+        env_meta['env_kwargs']['controller_configs']['output_max'] = SCALE_ACTION_LIMIT
+
+
+    env = EnvUtils.create_env_from_metadata(env_meta,
+                                            render=True,
+                                            use_image_obs=True)
+
+    print("CREATED ENVIRONMENT =================================================")
+    print(env)
+
+    ### Initializing OBS specs
+    demo = demo_file['data/demo_0']
+
+    obs = demo['obs']
+    obs_modality_spec = {"obs": {
+        "low_dim": [],
+        "rgb": []
+    }
+    }
+    for obs_key in obs:
+        if "image" in obs_key:
+            obs_modality_spec["obs"]["rgb"].append(obs_key)
+        else:
+            obs_modality_spec["obs"]["low_dim"].append(obs_key)
+
+    ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
+    return env, demo_file
 
 def demo_obs_to_obs_dict(demo_obs, ind):
     obs_dict = {}
@@ -308,3 +352,50 @@ def rollout_open_loop_bc_rnn_joint_actions(policy, env, horizon, render=False, v
             traj[k] = np.array(traj[k])
 
     return stats, traj
+
+def create_absolute_actions(
+                    states: np.ndarray,
+                    actions: np.ndarray,
+                    env) -> np.ndarray:
+    """
+    copied/adapted from https://github.com/columbia-ai-robotics/diffusion_policy/blob/main/diffusion_policy/common/robomimic_util.py
+    """
+    """
+    Given state and delta action sequence
+    generate equivalent goal position and orientation for each step
+    keep the original gripper action intact.
+    """
+    # in case of multi robot
+    # reshape (N,14) to (N,2,7)
+    # or (N,7) to (N,1,7)
+    stacked_actions = actions.reshape(*actions.shape[:-1], -1, 7)
+
+    # generate abs actions
+    action_goal_pos = np.zeros(
+        stacked_actions.shape[:-1] + (3,),
+        dtype=stacked_actions.dtype)
+    action_goal_ori = np.zeros(
+        stacked_actions.shape[:-1] + (3,),
+        dtype=stacked_actions.dtype)
+    action_gripper = stacked_actions[..., [-1]]
+    for i in range(len(states)):
+        _ = env.reset_to({'states': states[i]})
+
+        # taken from robot_env.py L#454
+        for idx, robot in enumerate(env.env.robots):
+            # run controller goal generator
+            robot.control(stacked_actions[i, idx], policy_step=True)
+
+            # read pos and ori from robots
+            controller = robot.controller
+            action_goal_pos[i, idx] = controller.goal_pos
+            action_goal_ori[i, idx] = Rotation.from_matrix(
+                controller.goal_ori).as_rotvec()
+
+    stacked_abs_actions = np.concatenate([
+        action_goal_pos,
+        action_goal_ori,
+        action_gripper
+    ], axis=-1)
+    abs_actions = stacked_abs_actions.reshape(actions.shape)
+    return abs_actions

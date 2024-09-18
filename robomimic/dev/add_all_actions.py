@@ -2,8 +2,11 @@ import nexusformat.nexus as nx
 import numpy as np
 import h5py
 import robomimic.utils.transform_utils as T
+import robomimic.utils.file_utils as FileUtils
+from dev_utils import complete_setup_for_replay, create_absolute_actions
 from copy import deepcopy
 import argparse
+
 
 def delta_axis_angle_to_absolute(delta_angles, quats):
     ret = []
@@ -35,6 +38,13 @@ def add_actions_to_dataset(demo_fn):
     demo_f = h5py.File(demo_fn, "a")
     demo_file = demo_f['data']
     env_args = demo_file.attrs["env_args"]
+
+    # Create env for absolute actions generation
+    env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
+    abs_env_meta = deepcopy(env_meta)
+    abs_env_meta['env_kwargs']['controller_configs']['control_delta'] = False
+    env, _ = complete_setup_for_replay(demo_fn, env_meta=abs_env_meta)
+
     # print(env_args)
     counter = 0
 
@@ -54,22 +64,27 @@ def add_actions_to_dataset(demo_fn):
         if "delta_joint_actions" in demo:
             del demo["delta_joint_actions"]
 
-        ### Create absolute eef actions
         delta_actions = demo['actions'][:]
+        states = demo['states'][:]
 
-        # Create absolute position action
-        delta_pos = delta_actions[:, 0:3]
-        pos = demo['obs/robot0_eef_pos'][:]
-        target_pos = delta_pos + pos
+        ### Create absolute eef actions
 
-        # Create absolute axis angle rotation action
-        delta_aa = delta_actions[:, 3:6]
-        quat = demo['obs/robot0_eef_quat'][:]
-        target_axis_angles = delta_axis_angle_to_absolute(delta_aa, quat)
+        absolute_actions = create_absolute_actions(states, actions=delta_actions, env=env)
 
-        # Create new absolute action array:
-        gripper_act = delta_actions[:, -1, np.newaxis]
-        absolute_actions = np.concatenate((target_pos, target_axis_angles, gripper_act), axis=1)
+        # # Create absolute position action
+        # delta_pos = delta_actions[:, 0:3]
+        # pos = demo['obs/robot0_eef_pos'][:]
+        # target_pos = delta_pos + pos
+        #
+        # # Create absolute axis angle rotation action
+        # delta_aa = delta_actions[:, 3:6]
+        # quat = demo['obs/robot0_eef_quat'][:]
+        # target_axis_angles = delta_axis_angle_to_absolute(delta_aa, quat)
+        #
+        # # Create new absolute action array:
+        # gripper_act = delta_actions[:, -1, np.newaxis]
+        # absolute_actions = np.concatenate((target_pos, target_axis_angles, gripper_act), axis=1)
+
         demo.create_dataset("absolute_actions", data=absolute_actions)
 
         ### Create joint position action
