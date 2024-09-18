@@ -31,21 +31,12 @@ def add_actions_to_dataset(demo_fn):
 
     print(f"Processing dataset: {demo_fn}")
 
-    # demo_fn  = "/media/nadun/Data/phd_project/robomimic/datasets/square/ph/low_dim_v141.hdf5"
-    # demo = nx.nxload(demo_fn)
-    # print(demo.tree)
-
     demo_f = h5py.File(demo_fn, "a")
     demo_file = demo_f['data']
-    env_args = demo_file.attrs["env_args"]
 
     # Create env for absolute actions generation
-    env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
-    abs_env_meta = deepcopy(env_meta)
-    abs_env_meta['env_kwargs']['controller_configs']['control_delta'] = False
-    env, _ = complete_setup_for_replay(demo_fn, env_meta=abs_env_meta)
+    env, _ = complete_setup_for_replay(demo_fn)
 
-    # print(env_args)
     counter = 0
 
     for demo in demo_file:
@@ -117,7 +108,6 @@ if __name__ == "__main__":
         help="path to dataset",
     )
     args = parser.parse_args()
-
 
     add_actions_to_dataset(args.dataset)
 
