@@ -23,8 +23,6 @@ import nexusformat.nexus as nx
 ### END IMPORTS
 
 
-
-
 def replay_by_aggregating(demo_fn, limit, aggregating_function=aggregate_delta_actions, video_fn=None):
     env, demo_file = complete_setup_for_replay(demo_fn)
 
@@ -365,7 +363,7 @@ def replay_absolute_actions(demo_fn, limit, video_fn):
         env.reset()
         env.reset_to(initial_state)
 
-        actions = demo["actions_abs"][:]
+        actions = demo["absolute_actions"][:]
 
         start = time.time()
 
@@ -398,9 +396,9 @@ def replay_absolute_actions(demo_fn, limit, video_fn):
 
 
 if __name__ == "__main__":
-    demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_all_actions.hdf5"
+    demo_fn = "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/tool_hang/ph/all_obs_v141.hdf5"
     # demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141.hdf5"
-    video_fn = "/media/nadun/Data/phd_project/robomimic/videos/lift/absolute_actions/replay_200.mp4"
+    video_fn = "/nethome/nkra3/flash7/phd_project/robomimic-nadun/videos/replay_absolute_actions/replay_tool_hang_200.mp4"
     ### execute functions
     # replay_joint_position_actions(demo_fn, 2, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_2.mp4")
     # replay_by_aggregating(demo_fn, 100, aggregating_function=aggregate_delta_actions, video_fn="/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/aggregated_actions_4.mp4")
