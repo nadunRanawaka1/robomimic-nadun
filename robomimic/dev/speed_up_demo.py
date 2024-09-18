@@ -389,7 +389,7 @@ def replay_absolute_actions(demo_fn, limit, video_fn):
         normal_reward += env.get_reward()
 
     print(f"Absolute action reward: {normal_reward}")
-    print(f"Time taken absolute_actions position: {time_taken}")
+    print(f"Time taken absolute_actions: {time_taken}")
 
     if video_fn is not None:
         video_writer.close()
