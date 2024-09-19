@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=can_image_obs_control_freq_eval
-#SBATCH --output=/coc/flash7/nkra3/logs/sbatch_out/phd_project/eval/can_image_obs_control_freq_eval.out
-#SBATCH --error=/coc/flash7/nkra3/logs/sbatch_err/phd_project/eval/can_image_obs_control_freq_eval.err
+#SBATCH --job-name=sqaure_all_obs_control_freq_eval
+#SBATCH --output=/coc/flash7/nkra3/logs/sbatch_out/phd_project/eval/sqaure_all_obs_control_freq_eval.out
+#SBATCH --error=/coc/flash7/nkra3/logs/sbatch_err/phd_project/eval/sqaure_all_obs_control_freq_eval.err
 #SBATCH --partition=overcap
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1

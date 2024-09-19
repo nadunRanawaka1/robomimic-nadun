@@ -6,9 +6,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=6
-#SBATCH --gpus-per-node="titan_x:1"
+#SBATCH --gpus-per-node="rtx_6000:1"
 #SBATCH --exclude="clippy"
-#SBATCH --mem-per-gpu=64
+#SBATCH --mem-per-gpu=128G
 
 export PYTHONUNBUFFERED=TRUE
 source ~/.bashrc

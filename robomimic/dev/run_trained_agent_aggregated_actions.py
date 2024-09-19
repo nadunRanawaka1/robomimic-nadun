@@ -686,7 +686,7 @@ def evaluate_aggregated_actions(args):
         df.to_excel(args.rollout_stats_path)
 
 
-def evaluate_over_control_freqs(args, start_range=10, end_range=20, step=10, success_threshold = 0.05):
+def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, success_threshold = 0.05):
 
     eval_data = defaultdict(list)
     counter = 0
@@ -732,7 +732,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=2,
+        default=200,
         help="number of rollouts",
     )
 
@@ -740,7 +740,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--horizon",
         type=int,
-        default=200,
+        default=400,
         help="(optional) override maximum horizon of rollout from the one in the checkpoint",
     )
 

@@ -10,20 +10,9 @@ from robomimic.robosuite_configs.paths import baxter
 # gripper_state = demo_file['data/demo_5/obs/gripper_state'][:]
 
 demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/demo_v141.hdf5"
-demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_all_actions.hdf5"
+demo_fn = "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/can/ph/all_obs_v141.hdf5"
 
 
 demo_file = nx.nxload(demo_fn)
 print(demo_file.tree)
-
-demo_file = h5py.File(demo_fn)
-
-data = demo_file['data']
-demo = data['demo_2']
-absolute_actions = demo['absolute_actions'][:]
-action_abs = demo['actions_abs'][:]
-
-delta_actions = demo['actions'][:]
-robot0_eef_pos = demo['obs/robot0_eef_pos'][:]
-print()
 
