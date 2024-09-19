@@ -156,7 +156,7 @@ class RobomimicAbsoluteActionConverter:
             'abs_max_error': abs_error_info
         }
         print("=========================================================================")
-        print(f"Finished evalling idx: {idx}")
+        print(f"Finished evaling idx: {idx}")
         print("=========================================================================")
         return abs_actions, info
 
