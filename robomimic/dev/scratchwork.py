@@ -1,7 +1,7 @@
 import os
 import nexusformat.nexus as nx
 import h5py
-from robomimic.robosuite_configs.paths import baxter
+import pickle
 #
 # demo_fn = "/home/robot-aiml/ac_learning_repos/Task_Demos/merged/demo_put_strawberry_in_bowl.hdf5"
 # demo_file = nx.nxload(demo_fn)
@@ -10,9 +10,18 @@ from robomimic.robosuite_configs.paths import baxter
 # gripper_state = demo_file['data/demo_5/obs/gripper_state'][:]
 
 demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/demo_v141.hdf5"
-demo_fn = "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/can/ph/all_obs_v141.hdf5"
+# demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
+demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
+
+# demo_file = nx.nxload(demo_fn)
+# print(demo_file.tree)
+
+with open("/media/nadun/Data/phd_project/experiment_logs/control_freq_eval/test.pkl", 'rb') as f:
+    data = pickle.load(f)
 
 
-demo_file = nx.nxload(demo_fn)
-print(demo_file.tree)
+
+
+print()
+
 

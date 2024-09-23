@@ -334,6 +334,10 @@ def replay_absolute_actions(demo_fn, limit, video_fn):
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
     abs_env_meta = deepcopy(env_meta)
     abs_env_meta['env_kwargs']['controller_configs']['control_delta'] = False
+    abs_env_meta["env_kwargs"]['has_offscreen_renderer'] = True
+    abs_env_meta['env_kwargs']["use_camera_obs"] = True
+    # TODO remove below
+    abs_env_meta["env_kwargs"]["control_freq"] = 100
     env, demo_file = complete_setup_for_replay(demo_fn, env_meta=abs_env_meta)
 
     # env, demo_file = complete_setup_for_replay(demo_fn)
@@ -377,6 +381,7 @@ def replay_absolute_actions(demo_fn, limit, video_fn):
 
         for i in range(n):
             act = np.copy(actions[i])
+            print(f"Stepping action: {i}")
 
             next_obs, _, _, _ = env.step(act)
 
@@ -396,13 +401,13 @@ def replay_absolute_actions(demo_fn, limit, video_fn):
 
 
 if __name__ == "__main__":
-    demo_fn = "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/tool_hang/ph/all_obs_v141.hdf5"
+    demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
     # demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141.hdf5"
-    video_fn = "/nethome/nkra3/flash7/phd_project/robomimic-nadun/videos/replay_absolute_actions/replay_tool_hang_200.mp4"
+    video_fn = "/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/can_abs_actions_control_freq_1000_play_2.mp4"
     ### execute functions
     # replay_joint_position_actions(demo_fn, 2, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_2.mp4")
     # replay_by_aggregating(demo_fn, 100, aggregating_function=aggregate_delta_actions, video_fn="/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/aggregated_actions_4.mp4")
-    replay_absolute_actions(demo_fn, 200, video_fn=video_fn)
+    replay_absolute_actions(demo_fn, 2, video_fn=video_fn)
 
 
 

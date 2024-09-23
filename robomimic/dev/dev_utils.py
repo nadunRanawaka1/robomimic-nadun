@@ -43,7 +43,8 @@ def complete_setup_for_replay(demo_fn, env_meta = None):
 
     env = EnvUtils.create_env_from_metadata(env_meta,
                                             render=True,
-                                            use_image_obs=True)
+                                            use_image_obs=True
+                                            )
 
     print("CREATED ENVIRONMENT =================================================")
     print(env)
