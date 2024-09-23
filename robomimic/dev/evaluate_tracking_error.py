@@ -75,8 +75,6 @@ def evaluate_rollout_error(env,
 
 def get_rollout_error_for_control_freq(demo_fn, control_freq):
 
-    demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
-
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
     abs_env_meta = deepcopy(env_meta)
     abs_env_meta['env_kwargs']['controller_configs']['control_delta'] = False
