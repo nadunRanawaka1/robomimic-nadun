@@ -1,7 +1,7 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "can_all_obs_split",
+        "name": "lift_all_obs_split",
         "validate": true,
         "logging": {
             "terminal_output_to_txt": true,
@@ -36,8 +36,8 @@
         }
     },
     "train": {
-        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/can/ph/all_obs_v141.hdf5",
-        "output_dir":"../bc_trained_models/diffusion_policy/sim/absolute_osc/",
+        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/lift/ph/all_obs_v141.hdf5",
+        "output_dir":"../bc_trained_models/diffusion_policy/sim/joint_position/",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
@@ -50,10 +50,10 @@
         "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
-            "absolute_actions"
+            "joint_position_actions"
         ],
         "action_keys": [
-            "absolute_actions"
+            "joint_position_actions"
         ],
         "action_config": {
             "absolute_actions": {
@@ -72,7 +72,7 @@
         "goal_mode": null,
         "cuda": true,
         "batch_size": 128,
-        "num_epochs": 600,
+        "num_epochs": 1000,
         "seed": 1
     },
     "algo": {

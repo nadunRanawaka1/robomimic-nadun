@@ -1,8 +1,8 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "can_all_obs_split",
-        "validate": true,
+        "name": "can_all_obs",
+        "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
             "log_tb": true,
@@ -37,23 +37,21 @@
     },
     "train": {
         "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/can/ph/all_obs_v141.hdf5",
-        "output_dir":"../bc_trained_models/diffusion_policy/sim/absolute_osc/",
+        "output_dir":"../bc_trained_models/diffusion_policy/sim/joint_position/",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": false,
         "hdf5_normalize_obs": false,
-        "hdf5_filter_key": "train",
-        "hdf5_validation_filter_key": "valid",
         "seq_length": 15,
         "pad_seq_length": true,
         "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
-            "absolute_actions"
+            "joint_position_actions"
         ],
         "action_keys": [
-            "absolute_actions"
+            "joint_position_actions"
         ],
         "action_config": {
             "absolute_actions": {
