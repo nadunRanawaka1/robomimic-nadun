@@ -59,6 +59,7 @@ import numpy as np
 from copy import deepcopy
 import time
 import os
+import datetime
 
 import torch
 
@@ -97,12 +98,13 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
     num_actual_actions = 0
 
     start_rollout = time.time()
+    actions_remaining = horizon
 
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
     try:
-        for step_i in range(horizon):
+        while actions_remaining > 0:
 
             # get action from policy
             start = time.time()
@@ -110,12 +112,13 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
             total_inference_time += time.time() - start
 
             # play action
-
+            # print(kwargs)
             if kwargs['return_action_sequence']:
                 # Step through joint action sequence
                 for i in range(act.shape[0]):
                     a = act[i]
                     next_obs, r, done, _ = env.step(a)
+                    actions_remaining -= 1
                     num_actual_actions += 1
                     if video_writer is not None:
                         if video_count % video_skip == 0:
@@ -136,6 +139,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                 act[:-1] *= 2
                 next_obs, r, done, _ = env.step(act)
                 num_actual_actions += 1
+                actions_remaining -= 1
 
             # compute reward
             total_reward += r
@@ -245,6 +249,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     total_inference_time = 0
 
+
     if return_obs:
         # store observations too
         traj.update(dict(obs=[], next_obs=[]))
@@ -335,7 +340,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     return stats, traj
 
 
-def run_trained_agent(args):
+def run_trained_agent(args, **kwargs):
     # some arg checking
     write_video = (args.video_path is not None)
     assert not (args.render and write_video) # either on-screen or video but not both
@@ -350,12 +355,12 @@ def run_trained_agent(args):
     device = TorchUtils.get_torch_device(try_to_use_cuda=True)
 
     # restore policy
-    policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=True)
+    policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=False)
 
     # TODO setting control freq here
     if args.control_freq is not None:
         ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
-    print()
+
 
     from robomimic.robosuite_configs.paths import joint_position as jp_path
     joint_controller_fp = jp_path()
@@ -364,8 +369,6 @@ def run_trained_agent(args):
 
     ckpt_dict["env_metadata"]["env_kwargs"]["controller_configs"] = controller_configs
 
-    # TODO setting kwargs for rollout here
-    kwargs = {"return_action_sequence": False, "aggregate_actions": False}
 
     # read rollout settings
     rollout_num_episodes = args.n_rollouts
@@ -381,7 +384,7 @@ def run_trained_agent(args):
         env_name=args.env, 
         render=args.render, 
         render_offscreen=(args.video_path is not None), 
-        verbose=True,
+        verbose=False,
     )
 
     # maybe set seed
@@ -461,7 +464,39 @@ def run_trained_agent(args):
         data_writer.close()
         print("Wrote dataset trajectories to {}".format(args.dataset_path))
 
-    return avg_rollout_stats
+    return avg_rollout_stats, rollout_stats
+
+
+def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, success_threshold = 0.05):
+
+    eval_data = defaultdict(list)
+    counter = 0
+
+    today = datetime.date.today()
+    control_freq_eval_save_path = os.path.abspath(
+        os.path.join(args.agent, '..', '..', f'logs/control_freq_eval_{today}.pkl'))
+    print(f"Saving stats to: {control_freq_eval_save_path}")
+
+
+    kwargs = {"return_action_sequence": True}
+    orig_horizon = args.horizon
+
+    for freq in range(start_range, end_range, step):
+        args.control_freq = freq
+        args.video_skip = freq//10
+
+        args.horizon = int(orig_horizon // (20 / freq))
+
+        print(f"Args horizon for control freq {freq} is: {args.horizon}")
+
+        args.video_path = f"{args.video_dir}/rollout_freq_{freq}.mp4"
+        avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
+        for stat in rollout_stats:
+            eval_data[stat].append(rollout_stats[stat])
+
+
+    df = pd.DataFrame(eval_data)
+    df.to_pickle(control_freq_eval_save_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -479,7 +514,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=20,
+        default=200,
         help="number of rollouts",
     )
 
@@ -487,7 +522,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--horizon",
         type=int,
-        default=None,
+        default=500,
         help="(optional) override maximum horizon of rollout from the one in the checkpoint",
     )
 
@@ -513,6 +548,13 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="(optional) render rollouts to this video file path",
+    )
+
+    parser.add_argument(
+        "--video_dir",
+        type=str,
+        default=None,
+        help = "(Optional) where to save videos of the different evals"
     )
 
     # How often to write video frames during the rollout
@@ -576,8 +618,15 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    # args.evaluate_control_freqs = True
-    # args.render = True
 
-    run_trained_agent(args)
+    if args.video_dir is None:
+        args.video_dir = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'videos'))
+
+    if args.rollout_stats_path is None:
+        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs',
+                                                               f'eval{datetime.datetime.now()}.xlsx'))
+
+    # run_trained_agent(args)
+
+    evaluate_over_control_freqs(args)
 

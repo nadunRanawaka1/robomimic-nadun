@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation
 import h5py
 import robomimic.utils.file_utils as FileUtils
 import robomimic.utils.env_utils as EnvUtils
-
+from torch.backends.mkl import verbose
 
 ### Setup some constants
 # TODO: find best way to handle these constants
@@ -64,7 +64,7 @@ def complete_setup_for_replay(demo_fn, env_meta = None):
         else:
             obs_modality_spec["obs"]["low_dim"].append(obs_key)
 
-    ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec)
+    ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec, verbose=False)
     return env, demo_file
 
 def demo_obs_to_obs_dict(demo_obs, ind):

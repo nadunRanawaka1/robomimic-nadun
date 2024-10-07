@@ -649,10 +649,6 @@ def evaluate_aggregated_actions(args):
     args.video_path = f"{args.video_dir}/normal_rollout.mp4"
     avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
     rollout_stats["action_magnitude_limit"] = [-1 for i in range(args.n_rollouts)]
-    # #
-    # # rollout_stats["kp"] = [150 for i in range(args.n_rollouts)]
-    # #
-    # #
     df = pd.DataFrame(rollout_stats)
 
     ### TODO: TESTING AGGREGATED ROLLOUTS
@@ -703,6 +699,7 @@ def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, su
 
     for freq in range(start_range, end_range, step):
         args.control_freq = freq
+        args.video_skip = freq//10
 
         args.video_path = f"{args.video_dir}/rollout_freq_{freq}.mp4"
         avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
