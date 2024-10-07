@@ -703,6 +703,7 @@ def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, su
 
     for freq in range(start_range, end_range, step):
         args.control_freq = freq
+        eval_data["control_freq"].append(freq)
 
         args.video_path = f"{args.video_dir}/rollout_freq_{freq}.mp4"
         avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)

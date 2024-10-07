@@ -1,7 +1,7 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "square_image",
+        "name": "square_image_no_framestack",
         "validate": false,
         "logging": {
             "terminal_output_to_txt": true,
@@ -44,9 +44,9 @@
         "hdf5_load_next_obs": false,
         "hdf5_normalize_obs": false,
         "hdf5_filter_key": null,
-        "seq_length": 15,
+        "seq_length": 16,
         "pad_seq_length": true,
-        "frame_stack": 2,
+        "frame_stack": 1,
         "pad_frame_stack": true,
         "dataset_keys": [
             "absolute_actions"
@@ -88,7 +88,7 @@
             }
         },
         "horizon": {
-            "observation_horizon": 2,
+            "observation_horizon": 1,
             "action_horizon": 8,
             "prediction_horizon": 16
         },
