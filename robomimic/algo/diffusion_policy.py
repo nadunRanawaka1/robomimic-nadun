@@ -349,6 +349,8 @@ class DiffusionPolicyUNet(PolicyAlgo):
         else:
             # no framestack, therefore just get the features from encoder
             obs_features = self.nets['policy']['obs_encoder'](**inputs) # [T, D]
+
+
         B = obs_features.shape[0]
 
         # reshape observation to (B,obs_horizon*obs_dim)
