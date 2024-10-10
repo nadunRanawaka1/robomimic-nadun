@@ -513,7 +513,7 @@ def run_trained_agent(args, **kwargs):
     device = TorchUtils.get_torch_device(try_to_use_cuda=True)
 
     # restore policy
-    policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=True)
+    policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=False)
 
     # TODO setting control freq here
     if args.control_freq is not None:
@@ -541,7 +541,7 @@ def run_trained_agent(args, **kwargs):
         env_name=args.env, 
         render=args.render, 
         render_offscreen=(args.video_path is not None), 
-        verbose=True,
+        verbose=False,
     )
 
     # maybe set seed
@@ -700,7 +700,7 @@ def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, su
     for freq in range(start_range, end_range, step):
         args.control_freq = freq
         eval_data["control_freq"].append(freq)
-        
+
         args.video_skip = freq//10
         args.video_path = f"{args.video_dir}/rollout_freq_{freq}.mp4"
         avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)

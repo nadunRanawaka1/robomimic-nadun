@@ -112,7 +112,6 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
             total_inference_time += time.time() - start
 
             # play action
-            # print(kwargs)
             if kwargs['return_action_sequence']:
                 # Step through joint action sequence
                 for i in range(act.shape[0]):

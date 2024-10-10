@@ -20,4 +20,4 @@ conda activate robomimic-dev
 
 cd /nethome/nkra3/flash7/phd_project/robomimic-nadun/robomimic
 
-srun -u python -u dev/run_trained_agent_aggregated_actions.py --agent=/nethome/nkra3/flash7/phd_project/robomimic-nadun/bc_trained_models/diffusion_policy/sim/absolute_osc/lift_image/20240910154404/models/model_epoch_500.pth
+srun -u python -u dev/run_trained_agent_aggregated_actions.py --agent=/nethome/nkra3/flash7/phd_project/robomimic-nadun/bc_trained_models/diffusion_policy/sim/absolute_osc/lift_image/20240919151422/models/model_epoch_500.pth
