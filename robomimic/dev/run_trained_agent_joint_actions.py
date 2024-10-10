@@ -524,7 +524,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=10,
+        default=200,
         help="number of rollouts",
     )
 
@@ -637,7 +637,7 @@ if __name__ == "__main__":
                                                                f'eval{datetime.datetime.now()}.xlsx'))
 
     kwargs = {"return_action_sequence": True}
-    run_trained_agent(args, **kwargs)
+    # run_trained_agent(args, **kwargs)
 
-    # evaluate_over_control_freqs(args)
+    evaluate_over_control_freqs(args)
 
