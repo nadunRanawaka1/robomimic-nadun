@@ -20,4 +20,4 @@ conda activate robomimic-dev
 
 cd /nethome/nkra3/flash7/phd_project/robomimic-nadun/robomimic
 
-srun -u python -u dev/add_all_actions.py --dataset=/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/tool_hang/ph/all_obs_v141.hdf5
+srun -u python -u dev/add_all_actions.py --dataset=/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/square/ph/all_obs_v141.hdf5
