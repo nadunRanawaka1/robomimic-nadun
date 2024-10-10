@@ -245,16 +245,16 @@ def replay_normal_speed(demo_fn, limit, video_fn=None):
 
 
 def replay_joint_position_actions(demo_fn, limit, video_fn):
-
+    freq = 70
     env, demo_file = complete_setup_for_replay(demo_fn)
 
     ### Init env
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
-    from robomimic.robosuite_configs.paths import joint_position as jp_path
-    joint_controller_fp = "/media/nadun/Data/phd_project/robomimic/robomimic/robosuite_configs/joint_position_nadun.json"
+    from robomimic.robosuite_configs.paths import joint_position_nadun as jp_path
     joint_controller_fp = jp_path()
     controller_configs = json.load(open(joint_controller_fp))
     env_meta["env_kwargs"]["controller_configs"] = controller_configs
+    env_meta["env_kwargs"]["control_freq"] = freq
 
     env = EnvUtils.create_env_from_metadata(env_meta,
                                             render=True,
@@ -267,6 +267,9 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
     normal_reward = 0
     time_taken = 0
     num_actions = 0
+
+    video_skip = freq // 20
+
 
     for ep in demo_file["data"]:
         counter += 1
@@ -284,12 +287,6 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
         env.reset()
         env.reset_to(initial_state)
 
-        actions = demo['obs/robot0_joint_pos'][:]  # action is [joint_pos, gripper] where dpos and drot are vectors of size 3
-        # actions = demo['obs/robot0_joint_vel'][:]
-        gripper_actions = demo['actions'][:,-1]
-        gripper_actions = np.expand_dims(gripper_actions, axis=1)
-
-        actions = np.concatenate([actions, gripper_actions], axis=1)
         actions = demo["joint_position_actions"]
 
         start = time.time()
@@ -309,12 +306,12 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
 
             joint_pos_list.append(joint_pos)
 
-            # act[:-1] = act[:-1] - joint_pos
+            act[:-1] = act[:-1] - joint_pos
             # act[:-1] *= 2
 
             next_obs, _, _, _ = env.step(act)
 
-            if video_fn is not None:
+            if video_fn is not None and (i % video_skip == 0):
                 video_img = env.env.sim.render(height=512, width=512, camera_name="agentview")[::-1]
                 video_writer.append_data(video_img)
 
@@ -331,13 +328,16 @@ def replay_joint_position_actions(demo_fn, limit, video_fn):
 def replay_absolute_actions(demo_fn, limit, video_fn):
 
 
+    freq = 70
+
+
     env_meta = FileUtils.get_env_metadata_from_dataset(demo_fn)
     abs_env_meta = deepcopy(env_meta)
     abs_env_meta['env_kwargs']['controller_configs']['control_delta'] = False
     abs_env_meta["env_kwargs"]['has_offscreen_renderer'] = True
     abs_env_meta['env_kwargs']["use_camera_obs"] = True
     # TODO remove below
-    abs_env_meta["env_kwargs"]["control_freq"] = 100
+    abs_env_meta["env_kwargs"]["control_freq"] = freq
     env, demo_file = complete_setup_for_replay(demo_fn, env_meta=abs_env_meta)
 
     # env, demo_file = complete_setup_for_replay(demo_fn)
@@ -350,6 +350,7 @@ def replay_absolute_actions(demo_fn, limit, video_fn):
     normal_reward = 0
     time_taken = 0
     num_actions = 0
+    video_skip = freq // 20
 
     for ep in demo_file["data"]:
         counter += 1
@@ -385,7 +386,7 @@ def replay_absolute_actions(demo_fn, limit, video_fn):
 
             next_obs, _, _, _ = env.step(act)
 
-            if video_fn is not None:
+            if video_fn is not None and (i % video_skip == 0):
                 video_img = env.env.sim.render(height=512, width=512, camera_name="agentview")[::-1]
                 video_writer.append_data(video_img)
                 # env.render(mode="human", camera_name="agentview")
@@ -403,12 +404,16 @@ def replay_absolute_actions(demo_fn, limit, video_fn):
 if __name__ == "__main__":
     demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
     # demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/all_obs_v141.hdf5"
-    video_fn = "/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/can_abs_actions_control_freq_1000_play_2.mp4"
+    # video_fn = "/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/can_replay_joint_pos_freq_70.mp4"
+    video_fn = "/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/can_replay_osc_freq_70.mp4"
     ### execute functions
-    # replay_joint_position_actions(demo_fn, 2, video_fn="/media/nadun/Data/phd_project/robomimic/videos/lift_sped_up/joint_positions_actions_2.mp4")
+
     # replay_by_aggregating(demo_fn, 100, aggregating_function=aggregate_delta_actions, video_fn="/media/nadun/Data/phd_project/robomimic/videos/can_sped_up/aggregated_actions_4.mp4")
     replay_absolute_actions(demo_fn, 2, video_fn=video_fn)
 
+    # replay_joint_position_actions(demo_fn, 2, video_fn=video_fn)
+
+    # replay_normal_speed(demo_fn, limit=2, video_fn=video_fn)
 
 
 

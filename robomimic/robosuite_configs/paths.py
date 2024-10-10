@@ -29,7 +29,7 @@ def ur5e():
 def ik_pose():
     return script_dir / 'ik_pose.json'
 
-def joint_position():
+def joint_position_nadun():
     return script_dir / 'joint_position_nadun.json'
 
 def joint_position_original():

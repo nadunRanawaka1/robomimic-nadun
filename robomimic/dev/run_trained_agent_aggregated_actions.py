@@ -653,7 +653,7 @@ def evaluate_aggregated_actions(args):
 
     ### TODO: TESTING AGGREGATED ROLLOUTS
 
-    check_gripper = False
+    check_gripper = True
 
     kwargs = {"return_action_sequence": True, "aggregate_actions": True, "delta_action_direction_threshold": 0.25,
                "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
@@ -843,6 +843,6 @@ if __name__ == "__main__":
         args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs',
                                                                f'eval{datetime.datetime.now()}.xlsx'))
 
-    # evaluate_aggregated_actions(args)
-    evaluate_over_control_freqs(args)
+    evaluate_aggregated_actions(args)
+    # evaluate_over_control_freqs(args)
 

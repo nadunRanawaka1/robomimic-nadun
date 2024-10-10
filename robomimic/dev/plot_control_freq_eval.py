@@ -5,13 +5,13 @@ import pickle
 from docutils.nodes import label
 from matplotlib.pyplot import ylabel
 import numpy as np
+import pandas as pd
 
 
 def plot_replay(data_fp=None):
     data_fp = '/media/nadun/Data/phd_project/experiment_logs/control_freq_eval/can_eval.pkl'
 
     with open(data_fp, 'rb') as f:
-
         data = pickle.load(f)
 
     print()
@@ -95,4 +95,24 @@ def plot_model(data_fp):
     print()
 
 
-plot_model('/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/absolute_osc/can_all_obs/20240918173401/logs/control_freq_eval_2024-09-19.pkl')
+def plot_sampling_freq_eval(data_fp, label):
+    df = pd.read_excel(data_fp)
+    control_freqs = df['control_freq']
+    success_rates = df['Success_Rate']
+    plt.title("Effect of changing observation sampling frequency on Lift Task")
+    plt.plot(control_freqs, success_rates, label=label)
+
+    print()
+
+
+
+# plot_model('/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/absolute_osc/can_all_obs/20240918173401/logs/control_freq_eval_2024-09-19.pkl')
+
+plot_sampling_freq_eval("/media/nadun/Data/phd_project/robomimic/bc_trained_models/bc_rnn/lift_bc_rnn_image_seq_10_rerun/20240517200334/logs/control_freq_eval.xlsx",
+                        label="image only model")
+plot_sampling_freq_eval("/media/nadun/Data/phd_project/robomimic/bc_trained_models/bc_rnn/lift_bc_rnn_low_dim_seq_10/20240514140435/logs/control_freq_eval.xlsx",
+                        label='low dim model')
+plt.ylabel ("Success Rate")
+plt.xlabel("Sampling Frequency (Hz)")
+plt.legend()
+plt.show()
