@@ -42,6 +42,7 @@ def evaluate_rollout_error(env,
         # obs = env.reset_to({'states': states[i]})
         obs, reward, done, info = env.step(actions[i])
         obs = env.get_observation()
+        hand_pos = env.env.robots[0]
         rollout_next_states.append(env.get_state()['states'])
         rollout_next_eef_pos.append(obs['robot0_eef_pos'])
         rollout_next_eef_quat.append(obs['robot0_eef_quat'])
@@ -148,14 +149,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        required=True,
+        # required=True,
+        default="/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5",
         help="path to dataset",
     )
 
     parser.add_argument(
         "--save_path",
         type=str,
-        required=True,
+        # required=True,
+        default="/media/nadun/Data/phd_project/experiment_logs/tracking_error_eval",
         help="where to save the rollout stats"
     )
 

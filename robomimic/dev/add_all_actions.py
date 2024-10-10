@@ -1,6 +1,8 @@
 import nexusformat.nexus as nx
 import numpy as np
 import h5py
+from requests.packages import target
+
 import robomimic.utils.transform_utils as T
 import robomimic.utils.file_utils as FileUtils
 from dev_utils import complete_setup_for_replay, create_absolute_actions
@@ -25,6 +27,15 @@ def delta_axis_angle_to_absolute(delta_angles, quats):
             print()
         ret.append(abs_aa)
 
+    return np.array(ret)
+
+def batch_quat_to_axis_angles(quats):
+    ret = []
+    for i in range(quats.shape[0]):
+        quat = quats[i]
+        axis, angle = T.quat2axisangle(quat)
+        axis_angle = T.axisangle2vec(axis, angle)
+        ret.append(axis_angle)
     return np.array(ret)
 
 def add_actions_to_dataset(demo_fn):
@@ -54,6 +65,8 @@ def add_actions_to_dataset(demo_fn):
             del demo["joint_position_actions"]
         if "delta_joint_actions" in demo:
             del demo["delta_joint_actions"]
+        if "reached_pose_action" in demo:
+            del demo["reached_pose_action"]
 
         delta_actions = demo['actions'][:]
         states = demo['states'][:]
@@ -61,22 +74,20 @@ def add_actions_to_dataset(demo_fn):
         ### Create absolute eef actions
 
         absolute_actions = create_absolute_actions(states, actions=delta_actions, env=env)
-
-        # # Create absolute position action
-        # delta_pos = delta_actions[:, 0:3]
-        # pos = demo['obs/robot0_eef_pos'][:]
-        # target_pos = delta_pos + pos
-        #
-        # # Create absolute axis angle rotation action
-        # delta_aa = delta_actions[:, 3:6]
-        # quat = demo['obs/robot0_eef_quat'][:]
-        # target_axis_angles = delta_axis_angle_to_absolute(delta_aa, quat)
-        #
-        # # Create new absolute action array:
-        # gripper_act = delta_actions[:, -1, np.newaxis]
-        # absolute_actions = np.concatenate((target_pos, target_axis_angles, gripper_act), axis=1)
-
         demo.create_dataset("absolute_actions", data=absolute_actions)
+
+        ### Create reached position action
+        target_pos = demo['obs/robot0_eef_pos'][1:]
+        target_pos = np.vstack([target_pos, target_pos[-1, :]])
+        target_axis_angles = absolute_actions[:, 3:-1]
+        # quats = demo['obs/robot0_eef_quat'][1:]
+        # reached_axis_angle = batch_quat_to_axis_angles(quats)
+        # reached_axis_angle = np.vstack([reached_axis_angle, reached_axis_angle[-1, :]])
+        gripper_act = delta_actions[:, -1, np.newaxis]
+
+        # TODO, we are using the commanded axis angles for this, use the actual reached axis angles
+        reached_pose_action = np.concatenate((target_pos, target_axis_angles, gripper_act), axis=1)
+        demo.create_dataset("reached_pose_action", data=reached_pose_action)
 
         ### Create joint position action
         joint_actions = demo['obs/robot0_joint_pos'][1:] # We offset by 1 since the next joint position is the action
@@ -104,7 +115,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        required=True,
+        # required=True,
+        default="/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5",
         help="path to dataset",
     )
     args = parser.parse_args()
