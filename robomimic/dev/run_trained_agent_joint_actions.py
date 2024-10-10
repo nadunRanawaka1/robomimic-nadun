@@ -110,12 +110,15 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
             start = time.time()
             act = policy(ob=obs, **kwargs)
             total_inference_time += time.time() - start
-
+            # print(f"Act shape is : {act.shape}")
             # play action
             if kwargs['return_action_sequence']:
                 # Step through joint action sequence
                 for i in range(act.shape[0]):
                     a = act[i]
+                    next_obs = env.get_observation()
+                    joint_pos = next_obs["robot0_joint_pos"]
+                    a[:-1] = a[:-1] - joint_pos
                     next_obs, r, done, _ = env.step(a)
                     actions_remaining -= 1
                     num_actual_actions += 1
@@ -135,7 +138,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                 next_obs = env.get_observation()
                 joint_pos = next_obs["robot0_joint_pos"]
                 act[:-1] = act[:-1] - joint_pos
-                act[:-1] *= 2
+                # act[:-1] *= 2
                 next_obs, r, done, _ = env.step(act)
                 num_actual_actions += 1
                 actions_remaining -= 1
@@ -258,13 +261,17 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
             # get action from policy
             start = time.time()
             act = policy(ob=obs, **kwargs)
+            print(f"Act shape is : {act.shape}")
             total_inference_time += time.time() - start
 
             # play action
             # TODO for now, we step through an action sequence here, maybe move it to the env_wrapper later
             if kwargs['return_action_sequence']:
-                for i in range(1):
+                for i in range(act.shape[0]):
                     single_act = act[i]
+                    next_obs = env.get_observation()
+                    joint_pos = next_obs["robot0_joint_pos"]
+                    single_act[:-1] = single_act[:-1] - joint_pos
                     next_obs, r, done, _ = env.step(single_act)
                     if video_writer is not None:
                         if video_count % video_skip == 0:
@@ -278,6 +285,9 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
                     if done:
                         break
             else:
+                next_obs = env.get_observation()
+                joint_pos = next_obs["robot0_joint_pos"]
+                act[:-1] = act[:-1] - joint_pos
                 next_obs, r, done, _ = env.step(act)
 
             # compute reward
@@ -505,7 +515,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/lift_image_diffusion_policy/20240609000333/models/model_epoch_600.pth",
+        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/joint_position/can_all_obs/20240921132324/models/model_epoch_600.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )
@@ -514,7 +524,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=200,
+        default=10,
         help="number of rollouts",
     )
 
@@ -626,7 +636,8 @@ if __name__ == "__main__":
         args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs',
                                                                f'eval{datetime.datetime.now()}.xlsx'))
 
-    # run_trained_agent(args)
+    kwargs = {"return_action_sequence": True}
+    run_trained_agent(args, **kwargs)
 
-    evaluate_over_control_freqs(args)
+    # evaluate_over_control_freqs(args)
 
