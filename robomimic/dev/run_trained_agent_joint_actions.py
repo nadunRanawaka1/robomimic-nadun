@@ -483,7 +483,7 @@ def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, su
 
     today = datetime.date.today()
     control_freq_eval_save_path = os.path.abspath(
-        os.path.join(args.agent, '..', '..', f'logs/control_freq_eval_{today}.pkl'))
+        os.path.join(args.agent, '..', '..', f'logs/control_freq_eval_horizon_400_{today}.pkl'))
     print(f"Saving stats to: {control_freq_eval_save_path}")
 
 
@@ -499,7 +499,7 @@ def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, su
 
         print(f"Args horizon for control freq {freq} is: {args.horizon}")
 
-        args.video_path = f"{args.video_dir}/rollout_freq_{freq}.mp4"
+        args.video_path = f"{args.video_dir}/rollout_freq_horizon_400_{freq}.mp4"
         avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
         for stat in rollout_stats:
             eval_data[stat].append(rollout_stats[stat])
@@ -532,7 +532,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--horizon",
         type=int,
-        default=500,
+        default=400,
         help="(optional) override maximum horizon of rollout from the one in the checkpoint",
     )
 
