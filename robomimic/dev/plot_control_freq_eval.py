@@ -6,6 +6,7 @@ from docutils.nodes import label
 from matplotlib.pyplot import ylabel
 import numpy as np
 import pandas as pd
+from sympy.utilities.mathml import apply_xsl
 
 
 def plot_replay(data_fp=None):
@@ -58,12 +59,8 @@ def plot_replay(data_fp=None):
     plt.legend()
     plt.show()
 
-def plot_model(data_fp):
-
+def get_statistics_from_model_rollout(data_fp):
     df = pd.read_pickle(data_fp)
-
-    control_freqs = [10,20,30,40,50,60,70,80,90]
-    df['control_freq'] = control_freqs
 
     X = []
     success_rates = []
@@ -80,7 +77,30 @@ def plot_model(data_fp):
 
         mask = succ_rate == 1.0
         horizon = horizon[mask]
-        sim_steps.append(np.mean(horizon) * (1000/cf))
+        sim_steps.append(np.mean(horizon) * (500 / cf))
+
+    return X, success_rates, sim_steps
+
+def plot_model(data_fp):
+
+    df = pd.read_pickle(data_fp)
+
+    X = []
+    success_rates = []
+    sim_steps = []
+
+    for index, row in df.iterrows():
+        cf = row['control_freq']
+        X.append(cf)
+
+        succ_rate = np.array(row['Success_Rate'])
+        succ = np.mean(succ_rate)
+        success_rates.append(succ)
+        horizon = np.array(row['Horizon'])
+
+        mask = succ_rate == 1.0
+        horizon = horizon[mask]
+        sim_steps.append(np.mean(horizon) * (500/cf))
 
     fig, axs = plt.subplots(2)
     axs[0].plot(X, success_rates, label="Success Rate")
@@ -106,13 +126,43 @@ def plot_sampling_freq_eval(data_fp, label):
 
 
 
-# plot_model('/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/absolute_osc/can_all_obs/20240918173401/logs/control_freq_eval_2024-09-19.pkl')
+### Plot OSC Pose eval
+data_fp = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/absolute_osc/can_image/20240918173345/logs/control_freq_eval_2024-10-06.pkl"
+control_freqs, success_rates, sim_steps = get_statistics_from_model_rollout(data_fp)
 
-plot_sampling_freq_eval("/media/nadun/Data/phd_project/robomimic/bc_trained_models/bc_rnn/lift_bc_rnn_image_seq_10_rerun/20240517200334/logs/control_freq_eval.xlsx",
-                        label="image only model")
-plot_sampling_freq_eval("/media/nadun/Data/phd_project/robomimic/bc_trained_models/bc_rnn/lift_bc_rnn_low_dim_seq_10/20240514140435/logs/control_freq_eval.xlsx",
-                        label='low dim model')
-plt.ylabel ("Success Rate")
-plt.xlabel("Sampling Frequency (Hz)")
+
+fig, axs = plt.subplots(2)
+# plt.plot(control_freqs, success_rates, color="maroon", label="OSC Pose Model")
+axs[0].plot(control_freqs, success_rates, color="maroon", label="Commanded Pose Model")
+axs[1].plot(control_freqs, sim_steps, color='maroon', label="Commanded Pose Model")
+
+### Plot Joint Position Eval
+
+data_fp = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/joint_position/can_image/20240921132026/logs/control_freq_eval_horizon_400_2024-10-10.pkl"
+
+_, success_rates, sim_steps = get_statistics_from_model_rollout(data_fp)
+
+axs[0].plot(control_freqs, success_rates, color="green", label="Joint Position Model")
+axs[1].plot(control_freqs, sim_steps, color="green", label="Joint Position Model")
+# plt.plot(control_freqs, sim_steps, color="green", label="Joint Position Model")
+# plt.plot(control_freqs, success_rates, color="green", label="Joint Position Model")
+
+
+### Plot reached osc eval
+
+data_fp = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/reached_osc/can_image/20241010114339/logs/control_freq_eval_2024-10-10.pkl"
+_, success_rates, sim_steps = get_statistics_from_model_rollout(data_fp)
+
+axs[0].plot(control_freqs, success_rates, color="darkorange", label="Reached Pose Model")
+axs[1].plot(control_freqs, sim_steps, color="darkorange", label="Reached Pose Model")
+
+
+axs[0].set_title("success rate over different speeds")
+axs[0].set_ylabel("Success Rate")
+
+axs[1].set_title("# sim steps at different speeds")
+plt.xlabel('Control Freq (Hz)')
+axs[1].set_ylabel("Sim Steps per success")
 plt.legend()
+
 plt.show()

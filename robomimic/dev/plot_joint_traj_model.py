@@ -44,6 +44,8 @@ log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/r
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_spline_2x_speed_run_2.pkl"
 log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/strawberry/strawberry_joint_position_actions/20240808154101/logs/rollout_fixed_window_blended_actions_spline_3x_speed_run_2.pkl"
 
+log_fn = "/media/nadun/Data/phd_project/experiment_logs/pick_cube_gripper/blended_actions_2x_run_4_spline_v2.pkl"
+
 with open(log_fn, "rb") as f:
     log = pickle.load(f)
 
@@ -101,14 +103,15 @@ for i, time in enumerate(demo['traj_start_times']):
     pred_x_list.append(pred_x)
 
 
-for i, X in enumerate(pred_x_list):
-    plt.plot(obs_x_list[i], obs_y_list[i], label="joint state at time of prediction", ls='None', marker=f'${str(i)}$',
-             color='red', markersize=16)
-    plt.plot(X, pred_y_list[i], label="predictions", ls='None', marker=f'${str(i)}$', color="orange", markersize=14)
+# for i, X in enumerate(pred_x_list):
+#     # plt.plot(obs_x_list[i], obs_y_list[i], label="joint state at time of prediction", ls='None', marker=f'${str(i)}$',
+#     #          color='red', markersize=16)
+#     plt.plot(X, pred_y_list[i], label="predictions", ls='None', marker=f'${str(i)}$', color="orange", markersize=14)
+    # plt.plot(X, pred_y_list[i], label="predictions", color="orange")
 
-#
-for i, X in enumerate(actual_x_list):
-    plt.plot(X, actual_y_list[i], label="blended actions", ls="None", marker=f'${str(i)}$', markersize=10, color="green")
+# #
+# for i, X in enumerate(actual_x_list):
+#     plt.plot(X, actual_y_list[i], label="blended actions", ls="None", marker=f'${str(i)}$', markersize=10, color="green")
 
 
 
@@ -145,8 +148,8 @@ for msg in traj_msgs:
     msg_y_list.append(msg_y)
 
 ### PLOT THE ACTUAL MSGS
-for i, X in enumerate(msg_X_list):
-    plt.plot(X, msg_y_list[i], color="purple", label="published traj msgs", marker="*", ls="None")
+# for i, X in enumerate(msg_X_list):
+#     plt.plot(X, msg_y_list[i], color="purple", label="published traj msgs", marker="*", ls="None")
 
 #### PLOTTING WITH TRAJ REPLACEMENT
 
