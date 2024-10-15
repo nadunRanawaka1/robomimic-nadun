@@ -91,6 +91,7 @@ class RobomimicAbsoluteActionConverter:
             dtype=stacked_actions.dtype)
         action_gripper = stacked_actions[...,[-1]]
         for i in range(len(states)):
+            print(f"Processing state: {i}")
             _ = env.reset_to({'states': states[i]})
 
             # taken from robot_env.py L#454
@@ -137,6 +138,7 @@ class RobomimicAbsoluteActionConverter:
 
         # generate abs actions
         abs_actions = self.convert_actions(states, actions)
+        print(f"Finished converting idx: {idx}")
 
         # verify
         robot0_eef_pos = demo['obs']['robot0_eef_pos'][:]
@@ -153,6 +155,9 @@ class RobomimicAbsoluteActionConverter:
             'delta_max_error': delta_error_info,
             'abs_max_error': abs_error_info
         }
+        print("=========================================================================")
+        print(f"Finished evaling idx: {idx}")
+        print("=========================================================================")
         return abs_actions, info
 
     @staticmethod
@@ -169,6 +174,7 @@ class RobomimicAbsoluteActionConverter:
         rollout_next_eef_quat = list()
         obs = env.reset_to({'states': states[0]})
         for i in range(len(states)):
+            print(f"Evaling state: {i}")
             obs = env.reset_to({'states': states[i]})
             obs, reward, done, info = env.step(actions[i])
             obs = env.get_observation()
