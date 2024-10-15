@@ -1,5 +1,6 @@
 import numpy as np
 from copy import deepcopy
+
 import time
 import robomimic.utils.tensor_utils as TensorUtils
 import robomimic.utils.obs_utils as ObsUtils
@@ -11,6 +12,7 @@ import h5py
 import robomimic.utils.file_utils as FileUtils
 import robomimic.utils.env_utils as EnvUtils
 from torch.backends.mkl import verbose
+
 
 ### Setup some constants
 # TODO: find best way to handle these constants
@@ -25,6 +27,15 @@ GRIPPER_COMMAND_CHANGE_THRESHOLD = 0.2
 
 REPEAT_LAST_ACTION_TIMES = 10
 
+
+
+def postprocess_obs(obs):
+    for key in obs:
+        if "image" in key or "rgb" in key and "time" not in key:
+            obs[key] = ObsUtils.process_obs(obs[key], obs_modality="rgb")
+        if "depth" in key and "time" not in key:
+            obs[key] = ObsUtils.process_obs(obs[key], obs_modality="depth")
+    return obs
 
 def complete_setup_for_replay(demo_fn, env_meta = None):
     demo_file = h5py.File(demo_fn)
@@ -66,6 +77,7 @@ def complete_setup_for_replay(demo_fn, env_meta = None):
 
     ObsUtils.initialize_obs_utils_with_obs_specs(obs_modality_spec, verbose=False)
     return env, demo_file
+
 
 def demo_obs_to_obs_dict(demo_obs, ind):
     obs_dict = {}

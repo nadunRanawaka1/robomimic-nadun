@@ -544,7 +544,7 @@ class RolloutPolicy(object):
         """Pretty print network description"""
         return self.policy.__repr__()
 
-    def __call__(self, ob, goal=None, **kwargs):
+    def __call__(self, ob, goal=None, return_all_pred=False, **kwargs):
         """
         Produce action from raw observation dict (and maybe goal dict) from environment.
 
@@ -557,10 +557,31 @@ class RolloutPolicy(object):
         if goal is not None:
             goal = self._prepare_observation(goal)
 
+
+        # TODO maybe move this to the class that calls rollout policy
+        if kwargs.get("inpaint_first_action", False):
+            if self.action_normalization_stats is not None:
+                action_keys = self.policy.global_config.train.action_keys
+                action_shapes = {k: self.action_normalization_stats[k]["offset"].shape[1:] for k in
+                                 self.action_normalization_stats}
+                ac_dict = AcUtils.vector_to_action_dict(kwargs["first_action"], action_shapes=action_shapes, action_keys=action_keys)
+                ac_dict = ObsUtils.normalize_dict(ac_dict, normalization_stats=self.action_normalization_stats)
+
+                ac_key = list(ac_dict)[0]
+                kwargs["first_action"] = ac_dict[ac_key]
+                print()
+
         ## TODO adding in kwargs for action sequence, make this more robust later
         # TODO if we get a sequence of actions from the policy, make sure to unnormalize the whole sequence properly
         ac = self.policy.get_action(obs_dict=ob, goal_dict=goal, **kwargs)
-        ac = TensorUtils.to_numpy(ac[0])
+
+        # TODO: since we do repeated sampling, change this now
+        if ac.shape[0] == 1:
+            ac = TensorUtils.to_numpy(ac[0])
+            ac_all = None
+        else:
+            ac_all = TensorUtils.to_numpy(ac)
+            ac = TensorUtils.to_numpy(ac[0])
         if self.action_normalization_stats is not None:
             action_keys = self.policy.global_config.train.action_keys
             action_shapes = {k: self.action_normalization_stats[k]["offset"].shape[1:] for k in self.action_normalization_stats}
@@ -574,5 +595,20 @@ class RolloutPolicy(object):
                     rot = TorchUtils.rot_6d_to_axis_angle(rot_6d=rot_6d).squeeze().numpy()
                     ac_dict[key] = rot
             ac = AcUtils.action_dict_to_vector(ac_dict, action_keys=action_keys)
-        return ac
+            if return_all_pred and ac_all is not None:
+                ac_dict = AcUtils.vector_to_action_dict(ac_all, action_shapes=action_shapes, action_keys=action_keys)
+                ac_dict = ObsUtils.unnormalize_dict(ac_dict, normalization_stats=self.action_normalization_stats)
+                action_config = self.policy.global_config.train.action_config
+                for key, value in ac_dict.items():
+                    this_format = action_config[key].get('format', None)
+                    if this_format == 'rot_6d':
+                        rot_6d = torch.from_numpy(value).unsqueeze(0)
+                        rot = TorchUtils.rot_6d_to_axis_angle(rot_6d=rot_6d).squeeze().numpy()
+                        ac_dict[key] = rot
+                ac_all = AcUtils.action_dict_to_vector(ac_dict, action_keys=action_keys)
+
+        if return_all_pred:
+            return ac, ac_all
+        else:
+            return ac
 
