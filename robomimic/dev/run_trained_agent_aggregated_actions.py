@@ -682,7 +682,7 @@ def evaluate_aggregated_actions(args):
         df.to_excel(args.rollout_stats_path)
 
 
-def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, success_threshold = 0.05):
+def evaluate_over_control_freqs(args, start_range=10, end_range=200, step=10, success_threshold = 0.05):
 
     eval_data = defaultdict(list)
     counter = 0
@@ -697,10 +697,12 @@ def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, su
               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
               "delta_action_magnitude_limit": 1.0, "kp": 150, "control_delta": False}
 
+    orig_horizon = args.horizon
     for freq in range(start_range, end_range, step):
         args.control_freq = freq
         eval_data["control_freq"].append(freq)
 
+        args.horizon = int(orig_horizon // (20 / freq))
         args.video_skip = freq//10
         args.video_path = f"{args.video_dir}/rollout_freq_{freq}.mp4"
         avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
@@ -843,6 +845,6 @@ if __name__ == "__main__":
         args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs',
                                                                f'eval{datetime.datetime.now()}.xlsx'))
 
-    evaluate_aggregated_actions(args)
-    # evaluate_over_control_freqs(args)
+    # evaluate_aggregated_actions(args)
+    evaluate_over_control_freqs(args)
 

@@ -371,7 +371,7 @@ def run_trained_agent(args, **kwargs):
         ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
 
 
-    from robomimic.robosuite_configs.paths import joint_position as jp_path
+    from robomimic.robosuite_configs.paths import joint_position_nadun as jp_path
     joint_controller_fp = jp_path()
     # joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
     controller_configs = json.load(open(joint_controller_fp))
@@ -393,7 +393,7 @@ def run_trained_agent(args, **kwargs):
         env_name=args.env, 
         render=args.render, 
         render_offscreen=(args.video_path is not None), 
-        verbose=False,
+        verbose=True,
     )
 
     # maybe set seed
@@ -476,14 +476,14 @@ def run_trained_agent(args, **kwargs):
     return avg_rollout_stats, rollout_stats
 
 
-def evaluate_over_control_freqs(args, start_range=10, end_range=100, step=10, success_threshold = 0.05):
+def evaluate_over_control_freqs(args, start_range=10, end_range=200, step=10, success_threshold = 0.05):
 
     eval_data = defaultdict(list)
     counter = 0
 
     today = datetime.date.today()
     control_freq_eval_save_path = os.path.abspath(
-        os.path.join(args.agent, '..', '..', f'logs/control_freq_eval_horizon_400_{today}.pkl'))
+        os.path.join(args.agent, '..', '..', f'logs/control_freq_eval_{today}.pkl'))
     print(f"Saving stats to: {control_freq_eval_save_path}")
 
 
