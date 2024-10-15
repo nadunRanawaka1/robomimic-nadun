@@ -1,8 +1,8 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "lift_image_diffusion_policy_joint_actions",
-        "validate": false,
+        "name": "can_all_obs_split",
+        "validate": true,
         "logging": {
             "terminal_output_to_txt": true,
             "log_tb": true,
@@ -12,7 +12,7 @@
         "save": {
             "enabled": true,
             "every_n_seconds": null,
-            "every_n_epochs": 50,
+            "every_n_epochs": 100,
             "epochs": [],
             "on_best_validation": false,
             "on_best_rollout_return": false,
@@ -36,29 +36,36 @@
         }
     },
     "train": {
-        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/lift/ph/all_obs_v141.hdf5",
-        "output_dir":"../bc_trained_models/diffusion_policy",
+        "data": "/nethome/nkra3/flash7/phd_project/robomimic-nadun/datasets/can/ph/all_obs_v141.hdf5",
+        "output_dir":"../bc_trained_models/diffusion_policy/sim/absolute_osc/",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": false,
         "hdf5_normalize_obs": false,
-        "hdf5_filter_key": null,
+        "hdf5_filter_key": "train",
+        "hdf5_validation_filter_key": "valid",
         "seq_length": 15,
         "pad_seq_length": true,
         "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
-            "joint_actions"
+            "absolute_actions"
         ],
         "action_keys": [
-            "joint_actions"
+            "absolute_actions"
         ],
         "action_config": {
             "absolute_actions": {
                 "normalization": "min_max"
             },
             "joint_actions": {
+                "normalization": "min_max"
+            },
+            "joint_position_actions": {
+                "normalization": "min_max"
+            },
+            "actions" : {
                 "normalization": "min_max"
             }
         },
@@ -120,6 +127,9 @@
         "modalities": {
             "obs": {
                 "low_dim": [
+                    "robot0_eef_pos",
+                    "robot0_eef_quat",
+                    "robot0_gripper_qpos"
                 ],
                 "rgb": [
                     "agentview_image",

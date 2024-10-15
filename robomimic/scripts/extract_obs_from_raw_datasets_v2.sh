@@ -33,7 +33,7 @@ echo "Using base dataset directory: $BASE_DATASET_DIR"
 
 python dataset_states_to_obs.py --done_mode 2 \
 --dataset $BASE_DATASET_DIR/square/ph/demo_v141.hdf5 \
---output_name all_obs_v141.hdf5 --camera_names agentview robot0_eye_in_hand --camera_height 84 --camera_width 84
+--output_name all_obs_new.hdf5 --camera_names agentview robot0_eye_in_hand --camera_height 84 --camera_width 84
 
 # transport - ph
 #
