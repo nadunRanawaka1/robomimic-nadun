@@ -484,6 +484,7 @@ def policy_from_checkpoint(device=None, ckpt_path=None, ckpt_dict=None, verbose=
         obs_normalization_stats=obs_normalization_stats,
         action_normalization_stats=action_normalization_stats
     )
+
     if verbose:
         print("============= Loaded Policy =============")
         print(model)

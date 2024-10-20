@@ -20,32 +20,37 @@ kwargs = {"return_action_sequence": True, "step_action_sequence": True,
 
 
 POINT_TIME = 0.05
-PLOT_AXIS = 0
+PLOT_FEATURE = 0
 RUN_ACTIONS = 2
+OBSERVATION_HORIZON = 2
 
 
 
 
 ### SETUP THE MODEL
-ckpt_path = "/home/robot-aiml/ac_learning_repos/robomik_cube_realsense/pick_cube_ee_control_framestack_2/20240905232039/models/model_epoch_1200.pth"
+ckpt_path = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/absolute_osc/can_all_obs_split/20240919170633/models/model_epoch_600.pth"
 
 # device
 device = TorchUtils.get_torch_device(try_to_use_cuda=True)
 
 # restore policy
-_, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=True)
-policy, _ = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=True)
+_, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=False)
+policy, _ = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=False)
 
 
 ### SETUP THE DEMO:
 
-demo_fn = "/home/robot-aiml/ac_learning_repos/Task_Demos/merged/demo_pick_cube_realsense_holdout.hdf5"
+demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
 # demo_fn = "/home/robot-aiml/ac_learning_repos/Task_Demos/merged/move_to_skynet/demo_pick_cube_realsense.hdf5"
+
+demo_file = nx.nxload(demo_fn)
+print(demo_file.tree)
 demo_file = h5py.File(demo_fn)['data']
 
-demo = demo_file['demo_2']
+demo = demo_file['demo_111']
+
 demo_obs = demo['obs']
-demo_actions = demo['absolute_axis_angle_actions']
+demo_actions = demo['absolute_actions']
 
 demo_length = demo.attrs['num_samples']
 
@@ -67,25 +72,25 @@ pred_y_list = []
 demo_acts = []
 
 for i in range(0, demo_length, RUN_ACTIONS):
-    obs = demo_obs_to_obs_dict(demo_obs, i)
+    obs = demo_obs_to_obs_dict(demo_obs, i, OBSERVATION_HORIZON)
     obs = postprocess_obs(obs)
     act, all_preds = policy(ob=obs, **kwargs)
 
-    obs_ee_pos.append(obs['ee_pose'][PLOT_AXIS])
+    obs_ee_pos.append(obs['robot0_eef_pos'][-1, PLOT_FEATURE])
     pred_actions.append(act)
     all_preds_list.append(all_preds)
 
     # Generating stuff for plotting
     obs_x_list.append([i*POINT_TIME])
-    obs_y_list.append([obs['ee_pose'][PLOT_AXIS]])
+    obs_y_list.append([obs['robot0_eef_pos'][-1, PLOT_FEATURE]])
 
-    demo_acts.append(demo_actions[i][PLOT_AXIS])
+    demo_acts.append(demo_actions[i][PLOT_FEATURE])
 
     pred_x = []
     pred_y = []
     for j in range(act.shape[0]):
         pred_x.append((i*POINT_TIME) + (j + 1)*POINT_TIME)
-        pred_y.append(act[j, PLOT_AXIS])
+        pred_y.append(act[j, PLOT_FEATURE])
 
     pred_x_list.append(pred_x)
     pred_y_list.append(pred_y)

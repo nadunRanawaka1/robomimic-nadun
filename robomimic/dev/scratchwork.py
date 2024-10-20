@@ -13,8 +13,8 @@ demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/lift/ph/demo_v141.hd
 # demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
 demo_fn = "/media/nadun/Data/phd_project/robomimic/datasets/can/ph/all_obs_v141.hdf5"
 
-# demo_file = nx.nxload(demo_fn)
-# print(demo_file.tree)
+demo_file =cd .. nx.nxload(demo_fn)
+print(demo_file.tree)
 
 with open("/media/nadun/Data/phd_project/experiment_logs/control_freq_eval/test.pkl", 'rb') as f:
     data = pickle.load(f)

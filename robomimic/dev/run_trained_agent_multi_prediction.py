@@ -125,23 +125,46 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
             # TODO for now, we aggregate the action sequence and step through it here
             if kwargs['return_action_sequence']:
                 # Play only the first action
-                for i in range(kwargs['execute_n_actions']):
-                    a = act[i]
-                    next_obs, r, done, _ = env.step(a)
-                    traj["executed_actions"].append(a)
-                    num_actual_actions += 1
-                    actions_remaining -= 1
-                    if video_writer is not None:
-                        if video_count % video_skip == 0:
-                            video_img = []
-                            for cam_name in camera_names:
-                                video_img.append(
-                                    env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
-                            video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
-                            video_writer.append_data(video_img)
-                        video_count += 1
-                    if done:
-                        break
+                if kwargs['osc_control']:
+                    for i in range(kwargs['execute_n_actions']):
+                        a = act[i]
+                        next_obs, r, done, _ = env.step(a)
+                        traj["executed_actions"].append(a)
+                        num_actual_actions += 1
+                        actions_remaining -= 1
+                        if video_writer is not None:
+                            if video_count % video_skip == 0:
+                                video_img = []
+                                for cam_name in camera_names:
+                                    video_img.append(
+                                        env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                                video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                                video_writer.append_data(video_img)
+                            video_count += 1
+                        if done:
+                            break
+                elif kwargs['joint_position_control']:
+                    for i in range(kwargs['execute_n_actions']):
+                        a = act[i]
+                        a_copy = np.copy(a)
+                        next_obs = env.get_observation()
+                        joint_pos = next_obs["robot0_joint_pos"]
+                        a_copy[:-1] = a_copy[:-1] - joint_pos
+                        next_obs, r, done, _ = env.step(a_copy)
+                        traj["executed_actions"].append(a)
+                        num_actual_actions += 1
+                        actions_remaining -= 1
+                        if video_writer is not None:
+                            if video_count % video_skip == 0:
+                                video_img = []
+                                for cam_name in camera_names:
+                                    video_img.append(
+                                        env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
+                                video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
+                                video_writer.append_data(video_img)
+                            video_count += 1
+                        if done:
+                            break
 
             else:
                 raise Exception("This script only works with return action sequence")
@@ -346,6 +369,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     return stats, traj
 
 
+
 def run_trained_agent(args, **kwargs):
     # some arg checking
     write_video = (args.video_path is not None)
@@ -420,6 +444,109 @@ def run_trained_agent(args, **kwargs):
             render=args.render, 
             video_writer=video_writer, 
             video_skip=args.video_skip, 
+            return_obs=(write_dataset and args.dataset_obs),
+            camera_names=args.camera_names,
+            **kwargs
+        )
+        stats["time_taken_in_run_agent"] = time.time() - start_episode
+        rollout_stats.append(stats)
+        rollout_trajs[f'demo_{i}'] = traj
+
+    rollout_stats = TensorUtils.list_of_flat_dict_to_dict_of_list(rollout_stats)
+
+    avg_rollout_stats = { k : np.mean(rollout_stats[k]) for k in rollout_stats }
+    avg_rollout_stats["Num_Success"] = np.sum(rollout_stats["Success_Rate"])
+    avg_rollout_stats[f"Time for {rollout_num_episodes} demos"] = time.time() - start
+
+    print("Average Rollout Stats")
+    print(json.dumps(avg_rollout_stats, indent=4))
+
+    if write_video:
+        video_writer.close()
+
+    if write_dataset:
+
+        with open(args.dataset_path, 'wb') as f:
+            pickle.dump(rollout_trajs, f)
+        print("Wrote dataset trajectories to {}".format(args.dataset_path))
+
+    return avg_rollout_stats, rollout_stats
+
+def run_trained_agent_joint_actions(args, **kwargs):
+    # some arg checking
+    write_video = (args.video_path is not None)
+    assert not (args.render and write_video) # either on-screen or video but not both
+    if args.render:
+        # on-screen rendering can only support one camera
+        assert len(args.camera_names) == 1
+
+    # relative path to agent
+    ckpt_path = args.agent
+
+    # device
+    device = TorchUtils.get_torch_device(try_to_use_cuda=True)
+
+    # restore policy
+    policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=False)
+
+    # TODO setting control and controller config here
+    if args.control_freq is not None:
+        ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
+
+
+    from robomimic.robosuite_configs.paths import joint_position_nadun as jp_path
+    joint_controller_fp = jp_path()
+    # joint_controller_fp = "/media/nadun/Data/phd_project/robosuite/robosuite/controllers/config/joint_velocity_nadun.json"
+    controller_configs = json.load(open(joint_controller_fp))
+
+    ckpt_dict["env_metadata"]["env_kwargs"]["controller_configs"] = controller_configs
+
+
+    # read rollout settings
+    rollout_num_episodes = args.n_rollouts
+    rollout_horizon = args.horizon
+    if rollout_horizon is None:
+        # read horizon from config
+        config, _ = FileUtils.config_from_checkpoint(ckpt_dict=ckpt_dict)
+        rollout_horizon = config.experiment.rollout.horizon
+
+    # create environment from saved checkpoint
+    env, _ = FileUtils.env_from_checkpoint(
+        ckpt_dict=ckpt_dict,
+        env_name=args.env,
+        render=args.render,
+        render_offscreen=(args.video_path is not None),
+        verbose=False,
+    )
+
+    # maybe set seed
+    if args.seed is not None:
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+
+    # maybe create video writer
+    video_writer = None
+    if write_video:
+        video_writer = imageio.get_writer(args.video_path, fps=20)
+
+    # do we write the rollout trajs?
+    write_dataset = (args.dataset_path is not None)
+
+    rollout_stats = []
+    rollout_trajs = {}
+    start = time.time()
+    c_freq = ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"]
+    print(f"Evaluating control frequency: {c_freq}")
+    for i in range(rollout_num_episodes):
+        print(f"Running rollout episode: {i}")
+        start_episode = time.time()
+        stats, traj = rollout(
+            policy=policy,
+            env=env,
+            horizon=rollout_horizon,
+            render=args.render,
+            video_writer=video_writer,
+            video_skip=args.video_skip,
             return_obs=(write_dataset and args.dataset_obs),
             camera_names=args.camera_names,
             **kwargs
@@ -593,7 +720,11 @@ if __name__ == "__main__":
 
     kwargs = {"return_action_sequence": True, "aggregate_actions": False, "delta_action_direction_threshold": 0.25,
               "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
-              "delta_action_magnitude_limit": 1.0, "kp": 150, "control_delta": False, "execute_n_actions":4}
+              "delta_action_magnitude_limit": 1.0, "kp": 150, "control_delta": False, "execute_n_actions":4,
+              "joint_position_control": True, "osc_control": False}
 
-    run_trained_agent(args, **kwargs)
+    # run_trained_agent(args, **kwargs)
 
+    # TODO set the controller type (joint position or osc) as an arg
+
+    run_trained_agent_joint_actions(args, **kwargs)
