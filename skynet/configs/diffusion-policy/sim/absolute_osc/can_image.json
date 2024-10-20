@@ -1,8 +1,8 @@
 {
     "algo_name": "diffusion_policy",
     "experiment": {
-        "name": "can_image_no_framestack",
-        "validate": false,
+        "name": "can_image_150_demos",
+        "validate": true,
         "logging": {
             "terminal_output_to_txt": true,
             "log_tb": true,
@@ -43,10 +43,11 @@
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": false,
         "hdf5_normalize_obs": false,
-        "hdf5_filter_key": null,
-        "seq_length": 16,
+        "hdf5_filter_key": "train_first_150",
+        "hdf5_validation_filter_key": "valid_last_50",
+        "seq_length": 15,
         "pad_seq_length": true,
-        "frame_stack": 1,
+        "frame_stack": 2,
         "pad_frame_stack": true,
         "dataset_keys": [
             "absolute_actions"
@@ -71,7 +72,7 @@
         "goal_mode": null,
         "cuda": true,
         "batch_size": 128,
-        "num_epochs": 600,
+        "num_epochs": 1000,
         "seed": 1
     },
     "algo": {
@@ -88,7 +89,7 @@
             }
         },
         "horizon": {
-            "observation_horizon": 1,
+            "observation_horizon": 2,
             "action_horizon": 8,
             "prediction_horizon": 16
         },

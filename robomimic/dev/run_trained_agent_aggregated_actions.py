@@ -740,7 +740,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--horizon",
         type=int,
-        default=400,
+        default=600,
         help="(optional) override maximum horizon of rollout from the one in the checkpoint",
     )
 
