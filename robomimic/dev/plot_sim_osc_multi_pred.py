@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 
 ### Some constants
 
-PLOT_FEATURE = 0 # which part of the pred to plot
+PLOT_FEATURE = 2 # which part of the pred to plot
 
-with open("/media/nadun/Data/phd_project/experiment_logs/sim_multi_eval/can_image_execute_4.pkl", 'rb') as f:
+with open("/media/nadun/Data/phd_project/experiment_logs/sim_multi_eval/can_image_joint_position.pkl", 'rb') as f:
     data = pickle.load(f)
 
 demo = data['demo_0']
@@ -29,6 +29,9 @@ for i, pred in enumerate(preds):
 for idx, X in enumerate(x_lists):
     plt.plot(X, y_lists[idx])
 
+
+plt.ylabel("Predicted x position")
+plt.xlabel("Timestep")
 plt.show()
 
 print()

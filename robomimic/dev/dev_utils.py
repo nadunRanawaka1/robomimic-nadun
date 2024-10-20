@@ -79,11 +79,41 @@ def complete_setup_for_replay(demo_fn, env_meta = None):
     return env, demo_file
 
 
-def demo_obs_to_obs_dict(demo_obs, ind):
+def demo_obs_to_obs_dict(demo_obs, ind, observation_horizon=2):
     obs_dict = {}
-    for o in demo_obs:
-        obs_dict[o] = np.array(demo_obs[o][ind])
+    if ind == 0: #special case for first obs
+        for o in demo_obs:
+            obs_array = np.array(demo_obs[o][ind])
+            obs_array = repeat_array(obs_array, observation_horizon)
+            obs_dict[o] = obs_array
+    else:
+        for o in demo_obs:
+            obs_dict[o] = np.array(demo_obs[o][ind - observation_horizon + 1:ind+1])
     return obs_dict
+
+
+def repeat_array(arr, C):
+    """
+    created through ChatGPT
+    Repeat an array C times along a new axis at the start.
+
+    Parameters:
+    arr (numpy.ndarray): The input array of shape (N, D1, D2, ...)
+    C (int): The number of times to repeat the array along the new axis.
+
+    Returns:
+    numpy.ndarray: The repeated array with shape (C, N, D1, D2, ...)
+    """
+    # Add a new dimension at axis 0
+    arr_expanded = np.expand_dims(arr, axis=0)
+
+    # Create the tiling pattern, with C repetitions in the new dimension and 1 for the others
+    tile_pattern = (C,) + (1,) * arr.ndim
+
+    # Repeat the array C times along the new dimension
+    arr_repeated = np.tile(arr_expanded, tile_pattern)
+
+    return arr_repeated
 
 def in_same_direction(act1, act2, threshold=DELTA_ACTION_DIRECTION_THRESHOLD):
     """

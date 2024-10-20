@@ -381,6 +381,7 @@ class DiffusionPolicyUNet(PolicyAlgo):
             )
 
             # inverse diffusion step (remove noise)
+            # TODO: inpaint in the below function before adding noise
             naction = self.noise_scheduler.step(
                 model_output=noise_pred,
                 timestep=k,
