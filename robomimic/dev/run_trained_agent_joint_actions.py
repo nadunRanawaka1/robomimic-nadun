@@ -96,6 +96,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
     traj = dict(actions=[], rewards=[], dones=[], states=[], initial_state_dict=state_dict)
     total_inference_time = 0
     num_actual_actions = 0
+    all_videos_imgs = []
 
     start_rollout = time.time()
     actions_remaining = horizon
@@ -130,6 +131,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                                     env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
                             video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
                             video_writer.append_data(video_img)
+                            all_videos_imgs.append(video_img)
                         video_count += 1
                     if done:
                         break
@@ -157,6 +159,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                         video_img.append(env.render(mode="rgb_array", height=512, width=512, camera_name=cam_name))
                     video_img = np.concatenate(video_img, axis=1)  # concatenate horizontally
                     video_writer.append_data(video_img)
+                    all_videos_imgs.append(video_img)
                 video_count += 1
 
             # collect transition
@@ -199,6 +202,13 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                 traj[k][kp] = np.array(traj[k][kp])
         else:
             traj[k] = np.array(traj[k])
+
+    # Create only the successful videos
+    if success:
+        success_video_writer = kwargs.get("success_video_writer", None)
+        if success_video_writer is not None:
+            for img in all_videos_imgs:
+                success_video_writer.append_data(img)
 
     return stats, traj
 
@@ -406,6 +416,12 @@ def run_trained_agent(args, **kwargs):
     if write_video:
         video_writer = imageio.get_writer(args.video_path, fps=20)
 
+    # create successful video writer
+    success_video_path = args.video_path.replace(".mp4", "_success_only.mp4")
+    if write_video:
+        success_video_writer = imageio.get_writer(success_video_path, fps=20)
+        kwargs['success_video_writer'] = success_video_writer
+
     # maybe open hdf5 to write rollouts
     write_dataset = (args.dataset_path is not None)
     if write_dataset:
@@ -499,7 +515,7 @@ def evaluate_over_control_freqs(args, start_range=10, end_range=200, step=10, su
 
         print(f"Args horizon for control freq {freq} is: {args.horizon}")
 
-        args.video_path = f"{args.video_dir}/rollout_freq_horizon__{freq}.mp4"
+        args.video_path = f"{args.video_dir}/rollout_horizon_{orig_horizon}_freq_{freq}.mp4"
         avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
         for stat in rollout_stats:
             eval_data[stat].append(rollout_stats[stat])
@@ -524,7 +540,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=200,
+        default=30,
         help="number of rollouts",
     )
 

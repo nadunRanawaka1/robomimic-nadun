@@ -127,7 +127,7 @@ def plot_sampling_freq_eval(data_fp, label):
 
 
 ### Plot OSC Pose eval
-data_fp = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/absolute_osc/can_image/20240918173345/logs/control_freq_eval_2024-10-06.pkl"
+data_fp = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/absolute_osc/can_image/20240918173345/logs/control_freq_eval_2024-10-13.pkl"
 control_freqs, success_rates, sim_steps = get_statistics_from_model_rollout(data_fp)
 
 
@@ -138,8 +138,7 @@ axs[1].plot(control_freqs, sim_steps, color='maroon', label="Commanded Pose Mode
 
 ### Plot Joint Position Eval
 
-data_fp = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/joint_position/can_image/20240921132026/logs/control_freq_eval_horizon_400_2024-10-10.pkl"
-
+data_fp = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/joint_position/can_image/20240921132026/logs/control_freq_eval_2024-10-13.pkl"
 _, success_rates, sim_steps = get_statistics_from_model_rollout(data_fp)
 
 axs[0].plot(control_freqs, success_rates, color="green", label="Joint Position Model")
@@ -150,17 +149,19 @@ axs[1].plot(control_freqs, sim_steps, color="green", label="Joint Position Model
 
 ### Plot reached osc eval
 
-data_fp = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/reached_osc/can_image/20241010114339/logs/control_freq_eval_2024-10-10.pkl"
+data_fp = "/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/reached_osc/can_image/20241010114339/logs/control_freq_eval_2024-10-13.pkl"
 _, success_rates, sim_steps = get_statistics_from_model_rollout(data_fp)
 
 axs[0].plot(control_freqs, success_rates, color="darkorange", label="Reached Pose Model")
 axs[1].plot(control_freqs, sim_steps, color="darkorange", label="Reached Pose Model")
 
 
-axs[0].set_title("success rate over different speeds")
+### Plotting stuff
+axs[0].set_ylim(0,1)
+axs[0].set_title("success rate over different speeds (Can)")
 axs[0].set_ylabel("Success Rate")
 
-axs[1].set_title("# sim steps at different speeds")
+axs[1].set_title("# sim steps at different speeds (Can)")
 plt.xlabel('Control Freq (Hz)')
 axs[1].set_ylabel("Sim Steps per success")
 plt.legend()
