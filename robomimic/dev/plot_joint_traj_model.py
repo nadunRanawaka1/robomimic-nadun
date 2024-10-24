@@ -181,8 +181,8 @@ for msg in traj_msgs:
     msg_y_list.append(msg_y)
 
 ### PLOT THE ACTUAL MSGS
-# for i, X in enumerate(msg_X_list):
-#     plt.plot(X, msg_y_list[i], color="purple", label="published traj msgs", marker="*", ls="None")
+for i, X in enumerate(msg_X_list):
+    plt.plot(X, msg_y_list[i], color="purple", label="published traj msgs", marker="*", ls="None")
 
 
 #### PLOTTING WITH TRAJ REPLACEMENT
