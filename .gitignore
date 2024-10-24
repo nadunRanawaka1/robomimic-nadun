@@ -10,6 +10,7 @@ dist/
 
 # trained models folder
 /bc_trained_models
+/act_trained_models
 
 #scratchwork
 scratchwork_2.py

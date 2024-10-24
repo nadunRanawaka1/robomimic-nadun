@@ -59,6 +59,7 @@ import numpy as np
 from copy import deepcopy
 import time
 import os
+import datetime
 
 import torch
 
@@ -77,7 +78,7 @@ import pandas as pd
 ### Setup some constants
 
 
-def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
+def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kwargs):
     assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
     assert isinstance(policy, RolloutPolicy)
     assert not (render and (video_writer is not None))
@@ -110,7 +111,7 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
             start = time.time()
 
             actions = []
-            if kw_args["return_action_sequence"]:
+            if kwargs["return_action_sequence"]:
                 for i in range(rollout_length):
                     act = policy(ob=obs)
                     actions.append(act)
@@ -119,9 +120,9 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
                 actions.append(act)
             total_inference_time += time.time() - start
 
-            if kw_args["aggregate_actions"]:
+            if kwargs["aggregate_actions"]:
 
-                agg_actions = aggregate_delta_actions(actions, obs=None, **kw_args)
+                agg_actions = aggregate_delta_actions(actions, obs=None, **kwargs)
 
                 # play aggregate actions
                 for act in agg_actions:
@@ -198,7 +199,7 @@ def rollout_open_loop_bc_rnn(policy, env, horizon, render=False, video_writer=No
 
     return stats, traj
 
-def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
+def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kwargs):
     assert isinstance(env, EnvBase) or isinstance(env, EnvWrapper)
     assert isinstance(policy, RolloutPolicy)
     assert not (render and (video_writer is not None))
@@ -222,10 +223,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
     slowdown_mode = False
     start_rollout = time.time()
 
-
     actions_remaining = horizon
-
-
 
     if return_obs:
         # store observations too
@@ -236,16 +234,16 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
 
             # get action from policy
             start = time.time()
-            act = policy(ob=obs, **kw_args)
+            act = policy(ob=obs, **kwargs)
             total_inference_time += time.time() - start
 
             # play action
 
             # TODO for now, we aggregate the action sequence and step through it here
-            if kw_args['return_action_sequence']:
-                if kw_args['aggregate_actions']:
+            if kwargs['return_action_sequence']:
+                if kwargs['aggregate_actions']:
                     # Play aggregated actions
-                    if kw_args["check_gripper"]:
+                    if kwargs["check_gripper"]:
                         if slowdown_mode:
                             agg_actions = act
                             slowdown_mode = False
@@ -253,9 +251,9 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
                             agg_actions = act
                             slowdown_mode = True
                         else:
-                            agg_actions = aggregate_delta_actions(act, None, **kw_args)
+                            agg_actions = aggregate_delta_actions(act, None, **kwargs)
                     else:
-                        agg_actions = aggregate_delta_actions(act, None, **kw_args)
+                        agg_actions = aggregate_delta_actions(act, None, **kwargs)
                     last_gripper_act = agg_actions[-1][-1]
                     for act in agg_actions:
                         next_obs, r, done, _ = env.step(act)
@@ -356,7 +354,7 @@ def rollout_diffusion_policy(policy, env, horizon, render=False, video_writer=No
 
     return stats, traj
 
-def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kw_args):
+def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5, return_obs=False, camera_names=None, **kwargs):
     """
     Helper function to carry out rollouts. Supports on-screen rendering, off-screen rendering to a video, 
     and returns the rollout trajectory.
@@ -387,9 +385,9 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     if (policy.policy.global_config.ALGO_NAME == "bc"):
         if policy.policy.algo_config.rnn.enabled:
             if policy.policy.algo_config.rnn.open_loop:
-                return rollout_open_loop_bc_rnn(policy, env, horizon, render, video_writer, video_skip, return_obs, camera_names, **kw_args)
+                return rollout_open_loop_bc_rnn(policy, env, horizon, render, video_writer, video_skip, return_obs, camera_names, **kwargs)
     elif (policy.policy.global_config.ALGO_NAME == "diffusion_policy"):
-        return rollout_diffusion_policy(policy, env, horizon, render, video_writer, video_skip, return_obs, camera_names, **kw_args)
+        return rollout_diffusion_policy(policy, env, horizon, render, video_writer, video_skip, return_obs, camera_names, **kwargs)
 
 
     policy.start_episode()
@@ -414,13 +412,13 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
 
             # get action from policy
             start = time.time()
-            act = policy(ob=obs, **kw_args)
+            act = policy(ob=obs, **kwargs)
             total_inference_time += time.time() - start
 
             # play action
 
             # TODO for now, we step through an action sequence here, maybe move it to the env_wrapper later
-            if kw_args['return_action_sequence']:
+            if kwargs['return_action_sequence']:
                 for i in range(1):
                     single_act = act[i]
                     next_obs, r, done, _ = env.step(single_act)
@@ -500,7 +498,7 @@ def rollout(policy, env, horizon, render=False, video_writer=None, video_skip=5,
     return stats, traj
 
 
-def run_trained_agent(args, **kw_args):
+def run_trained_agent(args, **kwargs):
     # some arg checking
     write_video = (args.video_path is not None)
     assert not (args.render and write_video) # either on-screen or video but not both
@@ -515,19 +513,19 @@ def run_trained_agent(args, **kw_args):
     device = TorchUtils.get_torch_device(try_to_use_cuda=True)
 
     # restore policy
-    policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=True)
+    policy, ckpt_dict = FileUtils.policy_from_checkpoint(ckpt_path=ckpt_path, device=device, verbose=False)
 
     # TODO setting control freq here
     if args.control_freq is not None:
         ckpt_dict["env_metadata"]["env_kwargs"]["control_freq"] = args.control_freq
 
-
     # TODO setting some scaling things here
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = - kw_args["delta_action_magnitude_limit"]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = kw_args["delta_action_magnitude_limit"]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] =  [kw_args["scale_action_limit"] * -1 for i in range(3)] + [kw_args["scale_action_limit"] * -10 for i in range(3)]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = [kw_args["scale_action_limit"] * 1 for i in range(3)] + [kw_args["scale_action_limit"] * 10 for i in range(3)]
-    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['kp'] = kw_args["kp"]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_min'] = - kwargs["delta_action_magnitude_limit"]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['input_max'] = kwargs["delta_action_magnitude_limit"]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_min'] =  [kwargs["scale_action_limit"] * -1 for i in range(3)] + [kwargs["scale_action_limit"] * -10 for i in range(3)]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['output_max'] = [kwargs["scale_action_limit"] * 1 for i in range(3)] + [kwargs["scale_action_limit"] * 10 for i in range(3)]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['kp'] = kwargs["kp"]
+    ckpt_dict["env_metadata"]['env_kwargs']['controller_configs']['control_delta'] = kwargs.get("control_delta", True)
 
     # read rollout settings
     rollout_num_episodes = args.n_rollouts
@@ -543,7 +541,7 @@ def run_trained_agent(args, **kw_args):
         env_name=args.env, 
         render=args.render, 
         render_offscreen=(args.video_path is not None), 
-        verbose=True,
+        verbose=False,
     )
 
     # maybe set seed
@@ -579,7 +577,7 @@ def run_trained_agent(args, **kw_args):
             video_skip=args.video_skip, 
             return_obs=(write_dataset and args.dataset_obs),
             camera_names=args.camera_names,
-            **kw_args
+            **kwargs
         )
         stats["time_taken_in_run_agent"] = time.time() - start_episode
         rollout_stats.append(stats)
@@ -643,37 +641,33 @@ def evaluate_aggregated_actions(args):
 
     df = None
 
-    kw_args = {"return_action_sequence": False, "aggregate_actions": False, "delta_action_direction_threshold": 0.25,
+    kwargs = {"return_action_sequence": False, "aggregate_actions": False, "delta_action_direction_threshold": 0.25,
                "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.10,
                "delta_action_magnitude_limit": 2.0, "kp": 150}
 
     ### TODO: TESTING NORMAL ROLLOUTS
     args.video_path = f"{args.video_dir}/normal_rollout.mp4"
-    avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
+    avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
     rollout_stats["action_magnitude_limit"] = [-1 for i in range(args.n_rollouts)]
-    # #
-    # # rollout_stats["kp"] = [150 for i in range(args.n_rollouts)]
-    # #
-    # #
     df = pd.DataFrame(rollout_stats)
 
     ### TODO: TESTING AGGREGATED ROLLOUTS
 
-    check_gripper = False
+    check_gripper = True
 
-    kw_args = {"return_action_sequence": True, "aggregate_actions": True, "delta_action_direction_threshold": 0.25,
+    kwargs = {"return_action_sequence": True, "aggregate_actions": True, "delta_action_direction_threshold": 0.25,
                "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
                "delta_action_magnitude_limit": 1.0, "kp": 150, "check_gripper": check_gripper}
 
     for idx, limit in enumerate(scale_action_limits):
 
-        kw_args["scale_action_limit"] = limit
-        kw_args["delta_action_magnitude_limit"] = delta_action_magnitude_limits[idx]
+        kwargs["scale_action_limit"] = limit
+        kwargs["delta_action_magnitude_limit"] = delta_action_magnitude_limits[idx]
 
         if args.video_dir is not None:
             args.video_path = f"{args.video_dir}/action_magnitude_{delta_action_magnitude_limits[idx]}_gripper_check_{check_gripper}.mp4"
 
-        avg_rollout_stats, rollout_stats = run_trained_agent(args, **kw_args)
+        avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
         rollout_stats["action_magnitude_limit"] = [delta_action_magnitude_limits[idx] for i in range(args.n_rollouts)]
         # rollout_stats["kp"] = [kp for i in range(args.n_rollouts)]
 
@@ -688,21 +682,36 @@ def evaluate_aggregated_actions(args):
         df.to_excel(args.rollout_stats_path)
 
 
-def evaluate_over_control_freqs(args, start_range=10, end_range=200, step=2, success_threshold = 0.05):
+def evaluate_over_control_freqs(args, start_range=10, end_range=200, step=10, success_threshold = 0.05):
 
     eval_data = defaultdict(list)
     counter = 0
-    for freq in range(start_range, end_range, step):
 
-        eval_data["control_freq"].append(freq)
+    today = datetime.date.today()
+    control_freq_eval_save_path = os.path.abspath(
+        os.path.join(args.agent, '..', '..', f'logs/control_freq_eval_{today}.pkl'))
+    print(f"Saving stats to: {control_freq_eval_save_path}")
+
+
+    kwargs = {"return_action_sequence": True, "aggregate_actions": False, "delta_action_direction_threshold": 0.25,
+              "delta_epsilon": np.array([1e-7, 1e-7, 1e-7]), "scale_action_limit": 0.05,
+              "delta_action_magnitude_limit": 1.0, "kp": 150, "control_delta": False}
+
+    orig_horizon = args.horizon
+    for freq in range(start_range, end_range, step):
         args.control_freq = freq
-        rollout_stats = run_trained_agent(args)
+        eval_data["control_freq"].append(freq)
+
+        args.horizon = int(orig_horizon // (20 / freq))
+        args.video_skip = freq//10
+        args.video_path = f"{args.video_dir}/rollout_freq_{freq}.mp4"
+        avg_rollout_stats, rollout_stats = run_trained_agent(args, **kwargs)
         for stat in rollout_stats:
             eval_data[stat].append(rollout_stats[stat])
 
+
     df = pd.DataFrame(eval_data)
-    control_freq_eval_save_path = os.path.abspath(os.path.join(args.agent, '..', '..', 'logs/control_freq_eval.xlsx'))
-    df.to_excel(control_freq_eval_save_path)
+    df.to_pickle(control_freq_eval_save_path)
 
 
 
@@ -713,7 +722,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agent",
         type=str,
-        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/lift_image_diffusion_policy/20240609000333/models/model_epoch_600.pth",
+        default="/media/nadun/Data/phd_project/robomimic/bc_trained_models/diffusion_policy/sim/absolute_osc/can_all_obs/20240918173401/models/model_epoch_600.pth",
         required=False,
         help="path to saved checkpoint pth file",
     )
@@ -723,7 +732,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_rollouts",
         type=int,
-        default=100,
+        default=200,
         help="number of rollouts",
     )
 
@@ -731,7 +740,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--horizon",
         type=int,
-        default=200,
+        default=400,
         help="(optional) override maximum horizon of rollout from the one in the checkpoint",
     )
 
@@ -833,10 +842,9 @@ if __name__ == "__main__":
         args.video_dir = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'videos'))
 
     if args.rollout_stats_path is None:
-        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs', 'aggregated_eval.xlsx'))
+        args.rollout_stats_path = os.path.abspath(os.path.join(os.path.dirname(args.agent), '..', 'logs',
+                                                               f'eval{datetime.datetime.now()}.xlsx'))
 
-    # if args.evaluate_control_freqs:
-    #     evaluate_over_control_freqs(args)
-    # else:
-    evaluate_aggregated_actions(args)
+    # evaluate_aggregated_actions(args)
+    evaluate_over_control_freqs(args)
 

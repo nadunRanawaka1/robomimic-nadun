@@ -114,6 +114,9 @@ class DiffusionPolicyUNet(PolicyAlgo):
         self.action_check_done = False
         self.obs_queue = None
         self.action_queue = None
+
+        assert self.algo_config.horizon.observation_horizon == self.global_config.train.frame_stack,\
+            "the observation horizon needs to be the same as the framestack"
     
     def process_batch_for_training(self, batch):
         """
@@ -378,6 +381,7 @@ class DiffusionPolicyUNet(PolicyAlgo):
             )
 
             # inverse diffusion step (remove noise)
+            # TODO: inpaint in the below function before adding noise
             naction = self.noise_scheduler.step(
                 model_output=noise_pred,
                 timestep=k,

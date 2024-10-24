@@ -1,7 +1,7 @@
 import h5py
 
 import torch
-
+import nexusformat.nexus as nx
 import robomimic
 import robomimic.utils.file_utils as FileUtils
 import robomimic.utils.env_utils as EnvUtils
@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 ### CONSTANTS
 
 kwargs = {"return_action_sequence": True, "step_action_sequence": True,
-              "diffusion_sample_n": 10, "return_all_pred": True}
+              "diffusion_sample_n": 1, "return_all_pred": True}
 
 
 POINT_TIME = 0.05
@@ -27,7 +27,7 @@ RUN_ACTIONS = 2
 
 
 ### SETUP THE MODEL
-ckpt_path = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/real_robot/speed_up_experiments/pick_cube_realsense/pick_cube_ee_control_framestack_2/20240905232039/models/model_epoch_1200.pth"
+ckpt_path = "/home/robot-aiml/ac_learning_repos/robomik_cube_realsense/pick_cube_ee_control_framestack_2/20240905232039/models/model_epoch_1200.pth"
 
 # device
 device = TorchUtils.get_torch_device(try_to_use_cuda=True)

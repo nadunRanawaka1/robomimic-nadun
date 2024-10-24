@@ -44,6 +44,8 @@ log_fn = "/home/robot-aiml/ac_learning_repos/robomimic-nadun/bc_trained_models/r
 
 log_fn = "/home/robot-aiml/ac_learning_repos/experiment_logs/pick_cube_realsense/joint_pos_no_framestack_3_cams/blended_actions_1x.pkl"
 
+log_fn = "/media/nadun/Data/phd_project/experiment_logs/pick_cube_gripper/blended_actions_2x_run_4_spline_v2.pkl"
+
 with open(log_fn, "rb") as f:
     log = pickle.load(f)
 
@@ -140,6 +142,7 @@ for i, X in enumerate(pred_x_list):
     #     plt.plot(X, y_samples, marker=f'${str(i)}$', markersize=10, ls='None', color="blue")
 
 #
+
 # for i, X in enumerate(actual_x_list):
 #     plt.plot(X, actual_y_list[i], label="blended actions", ls="None", marker=f'${str(i)}$', markersize=10, color="green")
 
@@ -182,7 +185,61 @@ for i, X in enumerate(msg_X_list):
     plt.plot(X, msg_y_list[i], color="purple", label="published traj msgs", marker="*", ls="None")
 
 
+#### PLOTTING WITH TRAJ REPLACEMENT
 
+# preds = demo['actions'][:]
+# timestep  = 0
+# replace_every = 8
+# x_list = []
+# y_list = []
+# for i in range(preds.shape[0]):
+#     traj =preds[i]
+#     y = []
+#     x = []
+#     for j in range(replace_every):
+#         y.append(traj[j, 0])
+#         x.append(timestep)
+#         timestep += 1
+#     x_list.append(x)
+#     y_list.append(y)
+#
+# color = iter(cm.rainbow(np.linspace(0, 1, len(y_list))))
+# for i, traj in enumerate(y_list):
+#     # c = next(color)
+#     plt.plot(x_list[i], traj)
+#
+# plt.ylabel("Joint command (rads)")
+# plt.xlabel("Timestep")
+# plt.show()
+# print()
+
+
+
+### Traj Replacement + Smoothing
+
+# preds = demo['actions'][:]
+# timestep  = 0
+# replace_every = 8
+# x_list = []
+# y_list = []
+# for i in range(preds.shape[0]):
+#     traj =preds[i]
+#     y = []
+#     x = []
+#     for j in range(replace_every):
+#         if j < 3:
+#             continue
+#         y.append(traj[j, 0])
+#         x.append(timestep)
+#         timestep += 1
+#     x_list.append(x)
+#     y_list.append(y)
+#
+# color = iter(cm.rainbow(np.linspace(0, 1, len(y_list))))
+# for i, traj in enumerate(y_list):
+#     # c = next(color)
+#     plt.plot(x_list[i], traj)
+#
 
 plt.ylabel("Joint Position")
 plt.xlabel("Timestep")
